@@ -9,8 +9,12 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "~54.0.33",
+    "auth": "^1.2.3",
+    "dotenv": "^17.4.2",
+    "expo": "^56.0.4",
     "expo-status-bar": "~3.0.9",
+    "firebase": "^12.13.0",
+    "firestore": "^1.1.6",
     "react": "19.1.0",
     "react-native": "0.81.5"
   },
