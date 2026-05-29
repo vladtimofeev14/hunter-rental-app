@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
         backgroundColor:
             colors.primaryBlue,
         padding: 15,
-        borderRadius: 10,
+        borderRadius: 30,
         alignItems: "center",
         marginTop: 10,
     },

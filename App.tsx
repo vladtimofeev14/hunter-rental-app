@@ -17,6 +17,7 @@ npx expo start
 */
 
 import React from "react";
+// @ts-ignore: suppress missing module type declarations in this environment
 import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import AppNavigator from "./src/navigation/AppNavigator";
