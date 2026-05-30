@@ -7,8 +7,8 @@ import SignupScreen from "../features/auth/SignupScreen";
 import UserProfileScreen from "../features/auth/UserProfileScreen";
 import RenterPreferencesScreen from "../features/renter/RenterPreferencesScreen";
 import RenterDashboard from "../features/renter/RenterDashboardScreen";
-import LandlordSetupScreen from "../features/landlord/LandlordSetupScreen";
 import LandlordDashboard from "../features/landlord/LandlordDashboardScreen"
+import LandlordAddListingScreen from "../features/landlord/LandlordAddListingScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -20,9 +20,9 @@ export default function AppNavigator() {
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="UserProfile" component={UserProfileScreen} />
       <Stack.Screen name="RenterPreferencesScreen" component={RenterPreferencesScreen} />
-      <Stack.Screen name="LandlordSetupScreen" component={LandlordSetupScreen} />
       <Stack.Screen name="RenterDashboard" component={RenterDashboard} />
       <Stack.Screen name="LandlordDashboard" component={LandlordDashboard} />
+      <Stack.Screen name="LandlordAddListingScreen" component={LandlordAddListingScreen} />
     </Stack.Navigator>
   );
 }

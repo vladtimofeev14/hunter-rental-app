@@ -23,21 +23,11 @@ export default function SignupScreen({ navigation }: any) {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [role, setRole] = useState<"renter" | "landlord" | null>(null);
 
-    const [showPasswordRules, setShowPasswordRules] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
     const validatePassword = (pwd: string) => {
-        const hasLetter = /[A-Za-z]/.test(pwd);
-        const hasNumber = /\d/.test(pwd);
-        const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pwd);
-
-        return (
-            pwd.length >= 8 &&
-            hasLetter &&
-            hasNumber &&
-            hasSpecial
-        );
+        return pwd.length >= 6;
     };
 
     const handleSignup = async () => {
@@ -56,7 +46,7 @@ export default function SignupScreen({ navigation }: any) {
         }
 
         if (!validatePassword(password)) {
-            setError("Password does not meet requirements.");
+            setError("Password must be at least 6 characters.");
             return;
         }
 
@@ -187,40 +177,6 @@ export default function SignupScreen({ navigation }: any) {
                         secureTextEntry
                     />
 
-                    <TouchableOpacity
-                        style={styles.passwordHintContainer}
-                        onPress={() =>
-                            setShowPasswordRules(
-                                !showPasswordRules
-                            )
-                        }
-                    >
-                        <Text style={styles.link}>
-                            Password requirements
-                        </Text>
-                    </TouchableOpacity>
-
-                    {showPasswordRules && (
-                        <View style={styles.rules}>
-                            <Text>
-                                • Minimum 8 characters
-                            </Text>
-
-                            <Text>
-                                • At least 1 letter
-                            </Text>
-
-                            <Text>
-                                • At least 1 number
-                            </Text>
-
-                            <Text>
-                                • At least 1 special
-                                character
-                            </Text>
-                        </View>
-                    )}
-
                     {error && (
                         <Text style={styles.error}>
                             {error}
@@ -317,18 +273,9 @@ const styles = StyleSheet.create({
             colors.primaryBlue,
     },
 
-    passwordHintContainer: {
-        alignSelf: "flex-start",
-        marginBottom: 5,
-    },
-
     link: {
         color: colors.primaryBlue,
         fontSize: 12,
-    },
-
-    rules: {
-        marginBottom: 10,
     },
 
     disclaimer: {
