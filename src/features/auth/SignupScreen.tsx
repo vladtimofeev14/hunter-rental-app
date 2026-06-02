@@ -17,7 +17,8 @@ import { auth, db } from "../../config/firebase";
 import { colors, sizes } from "../../styles/globalStyles";
 
 export default function SignupScreen({ navigation }: any) {
-    const [name, setName] = useState("");
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -31,11 +32,13 @@ export default function SignupScreen({ navigation }: any) {
     };
 
     const handleSignup = async () => {
-        const cleanName = name.trim();
+        const cleanFirstName = firstName.trim();
+        const cleanLastName = lastName.trim();
         const cleanEmail = email.trim();
 
         if (
-            !cleanName ||
+            !cleanFirstName ||
+            !cleanLastName ||
             !cleanEmail ||
             !password ||
             !confirmPassword ||
@@ -69,9 +72,15 @@ export default function SignupScreen({ navigation }: any) {
             const uid = userCredential.user.uid;
 
             await setDoc(doc(db, "users", uid), {
-                name: cleanName,
+                firstName: cleanFirstName,
+                lastName: cleanLastName,
                 email: cleanEmail,
                 role,
+                schoolAddress: "",
+                profileImageURL: "",
+                favoritesID: [],
+                rentingID: [],
+                propertiesID: [],
                 createdAt: new Date().toISOString(),
             });
 
@@ -102,9 +111,16 @@ export default function SignupScreen({ navigation }: any) {
 
                     <TextInput
                         style={styles.input}
-                        placeholder="Name"
-                        value={name}
-                        onChangeText={setName}
+                        placeholder="First Name"
+                        value={firstName}
+                        onChangeText={setFirstName}
+                    />
+
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Last Name"
+                        value={lastName}
+                        onChangeText={setLastName}
                     />
 
                     <TextInput

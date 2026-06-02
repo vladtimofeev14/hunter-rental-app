@@ -11,14 +11,18 @@ import {
     Image,
 } from "react-native";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
+import { REMEMBER_ME_KEY } from "../../config/storageKeys";
 import { colors, sizes } from "../../styles/globalStyles";
 
 export default function LoginScreen({ navigation }: any) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -46,6 +50,12 @@ export default function LoginScreen({ navigation }: any) {
             const userSnap = await getDoc(doc(db, "users", uid));
 
             const role = userSnap.exists() ? userSnap.data()?.role : null;
+
+            if (rememberMe) {
+                await AsyncStorage.setItem(REMEMBER_ME_KEY, "true");
+            } else {
+                await AsyncStorage.removeItem(REMEMBER_ME_KEY);
+            }
 
             if (role === "renter") {
                 navigation.reset({
@@ -99,6 +109,20 @@ export default function LoginScreen({ navigation }: any) {
                         onChangeText={setPassword}
                         secureTextEntry
                     />
+
+                    <TouchableOpacity
+                        style={styles.rememberRow}
+                        onPress={() => setRememberMe(!rememberMe)}
+                    >
+                        <Ionicons
+                            name={rememberMe ? "checkbox" : "square-outline"}
+                            size={22}
+                            color={rememberMe ? colors.primaryBlue : colors.textSecondary}
+                        />
+                        <Text style={styles.rememberText}>
+                            Remember Me
+                        </Text>
+                    </TouchableOpacity>
 
                     {error && <Text style={styles.error}>{error}</Text>}
 
@@ -155,6 +179,18 @@ const styles = StyleSheet.create({
     },
 
     buttonText: { color: "white", fontWeight: "600" },
+
+    rememberRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 15,
+    },
+
+    rememberText: {
+        marginLeft: 8,
+        color: colors.black,
+        fontWeight: "600",
+    },
 
     error: { color: "red", marginBottom: 10 },
 
