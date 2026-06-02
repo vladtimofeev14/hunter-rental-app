@@ -50,7 +50,7 @@ export default function LoginScreen({ navigation }: any) {
             if (role === "renter") {
                 navigation.reset({
                     index: 0,
-                    routes: [{ name: "RenterPreferencesScreen" }],
+                    routes: [{ name: "RenterDashboard" }],
                 });
             } else if (role === "landlord") {
                 navigation.reset({

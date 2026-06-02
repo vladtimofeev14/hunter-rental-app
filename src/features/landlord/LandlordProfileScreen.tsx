@@ -3,16 +3,16 @@ import { StyleSheet, Text, View } from "react-native";
 import AppNavigationBar from "../../components/AppNavigationBar";
 import { colors, sizes } from "../../styles/globalStyles";
 
-export default function RenterDashboardScreen({ navigation }: any) {
+export default function LandlordProfileScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Renter Dashboard</Text>
-      <Text style={styles.placeholder}>Renter Dashboard Screen Placeholder</Text>
+      <Text style={styles.title}>User Profile</Text>
+      <Text style={styles.placeholder}>Landlord Profile Screen Placeholder</Text>
 
       <AppNavigationBar
-        activeTab="Dashboard"
+        activeTab="Profile"
         navigation={navigation}
-        role="renter"
+        role="landlord"
       />
     </View>
   );
@@ -24,8 +24,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 20,
     paddingTop: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   title: {
     fontSize: sizes.large,

@@ -10,6 +10,7 @@ import {
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 import { colors, sizes } from "../../styles/globalStyles";
+import AppNavigationBar from "../../components/AppNavigationBar";
 
 interface Listing {
   id: string;
@@ -109,6 +110,12 @@ export default function LandlordDashboardScreen({ navigation }: any) {
       >
         <Text style={styles.buttonText}>Add Listing</Text>
       </TouchableOpacity>
+
+      <AppNavigationBar
+        activeTab="Dashboard"
+        navigation={navigation}
+        role="landlord"
+      />
     </View>
   );
 }
@@ -131,7 +138,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   listContent: {
-    paddingBottom: 90,
+    paddingBottom: 170,
   },
   card: {
     borderWidth: 1,
@@ -182,7 +189,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 20,
     right: 20,
-    bottom: 30,
+    bottom: 104,
   },
   buttonText: {
     color: "white",
