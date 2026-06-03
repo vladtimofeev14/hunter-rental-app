@@ -14,7 +14,7 @@ import {
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
-import { colors, sizes } from "../../styles/globalStyles";
+import { colors } from "../../styles/globalStyles";
 
 export default function LoginScreen({ navigation }: any) {
     const [email, setEmail] = useState("");
@@ -42,9 +42,7 @@ export default function LoginScreen({ navigation }: any) {
 
             const uid = cred.user.uid;
 
-            // FETCH ROLE IN FIREBASE + NAVIGATING DEPENDING ON IT
             const userSnap = await getDoc(doc(db, "users", uid));
-
             const role = userSnap.exists() ? userSnap.data()?.role : null;
 
             if (role === "renter") {
@@ -60,7 +58,6 @@ export default function LoginScreen({ navigation }: any) {
             } else {
                 setError("User role not found.");
             }
-
         } catch (e: any) {
             setError(e?.message || "Login failed");
         } finally {
@@ -75,7 +72,6 @@ export default function LoginScreen({ navigation }: any) {
         >
             <ScrollView contentContainerStyle={styles.content}>
                 <View style={styles.card}>
-
                     <Image
                         source={require("../../../assets/logo-icon-blue.png")}
                         style={styles.logo}
@@ -90,6 +86,7 @@ export default function LoginScreen({ navigation }: any) {
                         value={email}
                         onChangeText={setEmail}
                         autoCapitalize="none"
+                        placeholderTextColor="#A0A0A0"
                     />
 
                     <TextInput
@@ -98,6 +95,7 @@ export default function LoginScreen({ navigation }: any) {
                         value={password}
                         onChangeText={setPassword}
                         secureTextEntry
+                        placeholderTextColor="#A0A0A0"
                     />
 
                     {error && <Text style={styles.error}>{error}</Text>}
@@ -108,12 +106,14 @@ export default function LoginScreen({ navigation }: any) {
                         </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate("Signup")}
+                        style={styles.signupContainer}
+                    >
                         <Text style={styles.link}>
                             Don't have an account? Sign up
                         </Text>
                     </TouchableOpacity>
-
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -121,46 +121,77 @@ export default function LoginScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.white },
-    content: { flexGrow: 1, justifyContent: "center", padding: 20 },
-    card: { width: "100%" },
+    container: {
+        flex: 1,
+        backgroundColor: "#FFFFFF",
+    },
+
+    content: {
+        flexGrow: 1,
+        justifyContent: "center",
+        padding: 20,
+    },
+
+    card: {
+        width: "100%",
+    },
 
     logo: {
-        width: 80,
-        height: 80,
+        width: 90,
+        height: 90,
         alignSelf: "center",
-        marginBottom: 20,
+        marginBottom: 18,
     },
 
     title: {
-        fontSize: sizes.large,
-        fontWeight: "700",
+        fontSize: 30,
+        fontWeight: "800",
         textAlign: "center",
-        marginBottom: 30,
+        marginBottom: 28,
+        color: "#111827",
+        letterSpacing: -0.5,
     },
 
     input: {
-        borderWidth: 1,
-        borderColor: "#ddd",
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 15,
+        backgroundColor: "#F3F4F6",
+        paddingVertical: 16,
+        paddingHorizontal: 18,
+        borderRadius: 14,
+        marginBottom: 12,
+        fontSize: 16,
+        color: "#111827",
+        textAlignVertical: "center",
+        includeFontPadding: false,
     },
 
     button: {
         backgroundColor: colors.deepPurple,
-        padding: 15,
-        borderRadius: 30,
+        paddingVertical: 18,
+        borderRadius: 999,
+        alignItems: "center",
+        marginTop: 10,
+    },
+
+    buttonText: {
+        color: "white",
+        fontWeight: "700",
+        fontSize: 16,
+    },
+
+    error: {
+        color: "#DC2626",
+        marginBottom: 10,
+        marginTop: 4,
+    },
+
+    signupContainer: {
+        marginTop: 18,
         alignItems: "center",
     },
 
-    buttonText: { color: "white", fontWeight: "600" },
-
-    error: { color: "red", marginBottom: 10 },
-
     link: {
-        marginTop: 20,
-        textAlign: "center",
         color: colors.primaryBlue,
+        fontSize: 13,
+        fontWeight: "600",
     },
 });

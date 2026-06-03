@@ -2,193 +2,180 @@ import React, { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   TextInput,
   FlatList,
-  TouchableOpacity,
+  StyleSheet,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../config/firebase";
-import { colors } from "../../styles/globalStyles";
-import { Ionicons } from "@expo/vector-icons";
-
-type Listing = {
-  id: string;
-  name: string;
-  city: string;
-  address: string;
-  bedrooms: number;
-  bathrooms: number;
-  price: { amount: number; period: string };
-  propertyType: string;
-  furnished?: boolean;
-  images: string[];
-};
+import ListingCard from "./components/ListingCard";
 
 export default function SearchScreen({ navigation }: any) {
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // filters
+  const [listings, setListings] = useState<any[]>([]);
   const [query, setQuery] = useState("");
-  const [maxBudget, setMaxBudget] = useState(3000);
-  const [bedrooms, setBedrooms] = useState<number | null>(null);
-  const [furnished, setFurnished] = useState<boolean | null>(null);
-  const [sortBy, setSortBy] = useState<"price" | "default">("default");
 
-  // 🔥 fetch listings once
+  const [filters, setFilters] = useState({
+    bedrooms: null as number | null,
+    furnished: null as boolean | null,
+    sortBy: "default" as "default" | "price",
+  });
+
   useEffect(() => {
-    const fetchListings = async () => {
-      try {
-        const snap = await getDocs(collection(db, "listings"));
-        const data = snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Listing[];
-
-        setListings(data);
-      } catch (e) {
-        console.log("Error loading listings:", e);
-      } finally {
-        setLoading(false);
-      }
+    const load = async () => {
+      const snap = await getDocs(collection(db, "listings"));
+      setListings(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     };
-
-    fetchListings();
+    load();
   }, []);
 
-  // 🔍 filtering logic (production-safe)
   const filtered = useMemo(() => {
     let results = [...listings];
 
-    // text search
     if (query.trim()) {
-      const q = query.toLowerCase();
-      results = results.filter(
-        (l) =>
-          l.name?.toLowerCase().includes(q) ||
-          l.city?.toLowerCase().includes(q) ||
-          l.address?.toLowerCase().includes(q)
+      const q = query.toLowerCase().trim();
+      results = results.filter((l) =>
+        [l.name, l.city, l.address]
+          .filter(Boolean)
+          .some((f) => f.toLowerCase().includes(q))
       );
     }
 
-    // budget filter
-    results = results.filter(
-      (l) => (l.price?.amount || 0) <= maxBudget
-    );
-
-    // bedrooms filter
-    if (bedrooms !== null) {
-      results = results.filter((l) => l.bedrooms === bedrooms);
+    if (filters.bedrooms !== null) {
+      results = results.filter((l) => l.bedrooms === filters.bedrooms);
     }
 
-    // furnished filter
-    if (furnished !== null) {
-      results = results.filter((l) => l.furnished === furnished);
+    if (filters.furnished !== null) {
+      results = results.filter((l) => l.furnished === filters.furnished);
     }
 
-    // sorting
-    if (sortBy === "price") {
+    if (filters.sortBy === "price") {
       results.sort((a, b) => a.price.amount - b.price.amount);
     }
 
     return results;
-  }, [listings, query, maxBudget, bedrooms, furnished, sortBy]);
+  }, [listings, query, filters]);
 
-  const renderItem = ({ item }: { item: Listing }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() =>
-        navigation.navigate("PropertyDetails", { listingId: item.id })
-      }
+  const Chip = ({ active, onPress, children }: any) => (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.chip,
+        active && styles.chipActive,
+        pressed && styles.chipPressed,
+      ]}
     >
-      <Text style={styles.title}>{item.name}</Text>
-      <Text style={styles.subtitle}>
-        {item.city} · ${item.price.amount}/{item.price.period}
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+        {children}
       </Text>
-
-      <Text style={styles.meta}>
-        {item.bedrooms} bed · {item.bathrooms} bath · {item.propertyType}
-      </Text>
-    </TouchableOpacity>
+    </Pressable>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* SEARCH BAR */}
+      {/* SEARCH */}
       <View style={styles.searchBox}>
-        <Ionicons name="search-outline" size={18} color="#888" />
         <TextInput
-          placeholder="Search city, address, listing..."
+          placeholder="Search city, address..."
           value={query}
           onChangeText={setQuery}
-          style={styles.input}
+          style={styles.searchInput}
         />
       </View>
 
-      {/* FILTER ROW */}
-      <View style={styles.filters}>
-        <TouchableOpacity
-          onPress={() => setSortBy("price")}
-          style={styles.filterBtn}
+      {/* FILTERS */}
+      <View style={styles.filterBar}>
+        <Chip
+          active={filters.sortBy === "price"}
+          onPress={() =>
+            setFilters((p) => ({
+              ...p,
+              sortBy: p.sortBy === "price" ? "default" : "price",
+            }))
+          }
         >
-          <Text>Price</Text>
-        </TouchableOpacity>
+          Price
+        </Chip>
 
-        <TouchableOpacity
-          onPress={() => setBedrooms(1)}
-          style={styles.filterBtn}
+        <Chip
+          active={filters.bedrooms === 1}
+          onPress={() =>
+            setFilters((p) => ({
+              ...p,
+              bedrooms: p.bedrooms === 1 ? null : 1,
+            }))
+          }
         >
-          <Text>1BR</Text>
-        </TouchableOpacity>
+          1BR
+        </Chip>
 
-        <TouchableOpacity
-          onPress={() => setBedrooms(2)}
-          style={styles.filterBtn}
+        <Chip
+          active={filters.bedrooms === 2}
+          onPress={() =>
+            setFilters((p) => ({
+              ...p,
+              bedrooms: p.bedrooms === 2 ? null : 2,
+            }))
+          }
         >
-          <Text>2BR</Text>
-        </TouchableOpacity>
+          2BR
+        </Chip>
 
-        <TouchableOpacity
-          onPress={() => setFurnished(true)}
-          style={styles.filterBtn}
+        <Chip
+          active={filters.furnished === true}
+          onPress={() =>
+            setFilters((p) => ({
+              ...p,
+              furnished: p.furnished === true ? null : true,
+            }))
+          }
         >
-          <Text>Furnished</Text>
-        </TouchableOpacity>
+          Furnished
+        </Chip>
 
-        <TouchableOpacity
+        <Pressable
           onPress={() => {
-            setBedrooms(null);
-            setFurnished(null);
-            setSortBy("default");
             setQuery("");
+            setFilters({
+              bedrooms: null,
+              furnished: null,
+              sortBy: "default",
+            });
           }}
-          style={styles.resetBtn}
+          style={({ pressed }) => [
+            styles.chip,
+            styles.resetChip,
+            pressed && styles.chipPressed,
+          ]}
         >
-          <Text style={{ color: "#fff" }}>Reset</Text>
-        </TouchableOpacity>
+          <Text style={styles.chipText}>Reset</Text>
+        </Pressable>
       </View>
 
-      {/* RESULTS */}
+      {/* MAP BUTTON */}
+      <Pressable
+        onPress={() =>
+          navigation.navigate("MapScreen", {
+            listings: filtered,
+          })
+        }
+      >
+        <Text>Open Map</Text>
+      </Pressable>
+
+      {/* LIST */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
-        renderItem={renderItem}
+        renderItem={({ item }) => (
+          <ListingCard item={item} navigation={navigation} />
+        )}
         contentContainerStyle={{ paddingBottom: 120 }}
-        ListEmptyComponent={
-          !loading ? (
-            <Text style={styles.empty}>No listings found</Text>
-          ) : (
-            <Text style={styles.empty}>Loading...</Text>
-          )
-        }
       />
     </SafeAreaView>
   );
 }
-
-/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   container: {
@@ -197,69 +184,51 @@ const styles = StyleSheet.create({
   },
 
   searchBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    margin: 16,
-    paddingHorizontal: 12,
+    margin: 12,
     backgroundColor: "#fff",
-    borderRadius: 14,
-    height: 45,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    justifyContent: "center",
   },
 
-  input: {
-    marginLeft: 8,
-    flex: 1,
+  searchInput: {
+    fontSize: 14,
   },
 
-  filters: {
+  filterBar: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingHorizontal: 16,
     gap: 8,
-  },
-
-  filterBtn: {
-    backgroundColor: "#fff",
-    paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 12,
+    marginBottom: 8,
   },
 
-  resetBtn: {
-    backgroundColor: colors.deepPurple,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+  chip: {
+    backgroundColor: "#E5E7EB",
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
   },
 
-  card: {
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginTop: 10,
-    padding: 14,
-    borderRadius: 14,
+  chipPressed: {
+    opacity: 0.7,
   },
 
-  title: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  subtitle: {
+  chipText: {
     fontSize: 12,
-    color: "#6B7280",
-    marginTop: 4,
+    color: "#111",
   },
 
-  meta: {
-    fontSize: 11,
-    color: "#9CA3AF",
-    marginTop: 4,
+  chipActive: {
+    backgroundColor: "#111827",
   },
 
-  empty: {
-    textAlign: "center",
-    marginTop: 40,
-    color: "#6B7280",
+  chipTextActive: {
+    color: "#fff",
+  },
+
+  resetChip: {
+    backgroundColor: "#F3F4F6",
   },
 });

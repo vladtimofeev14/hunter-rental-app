@@ -38,7 +38,6 @@ export default function UserProfileScreen({ navigation }: any) {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
 
-        {/* HEADER (centered like auth screens) */}
         <View style={styles.header}>
           <View style={styles.avatar}>
             <Ionicons name="person" size={22} color="#fff" />
@@ -65,7 +64,7 @@ export default function UserProfileScreen({ navigation }: any) {
           )}
         </View>
 
-        {/* EDIT BUTTON (same style as login/signup button) */}
+        {/* EDIT BUTTON */}
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => navigation.navigate("RenterPreferencesScreen")}
@@ -82,8 +81,6 @@ export default function UserProfileScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
-
-/* ================= STYLE ================= */
 
 const styles = StyleSheet.create({
   container: {

@@ -2,9 +2,7 @@ import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import { colors } from "../styles/globalStyles";
-
 import RenterDashboardScreen from "../features/renter/RenterDashboardScreen";
 import SearchScreen from "../features/renter/SearchScreen";
 import MapScreen from "../features/renter/MapScreen";

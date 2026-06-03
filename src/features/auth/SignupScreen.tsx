@@ -14,7 +14,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 
 import { auth, db } from "../../config/firebase";
-import { colors, sizes } from "../../styles/globalStyles";
+import { colors } from "../../styles/globalStyles";
 
 export default function SignupScreen({ navigation }: any) {
     const [name, setName] = useState("");
@@ -32,25 +32,14 @@ export default function SignupScreen({ navigation }: any) {
         const hasNumber = /\d/.test(pwd);
         const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pwd);
 
-        return (
-            pwd.length >= 8 &&
-            hasLetter &&
-            hasNumber &&
-            hasSpecial
-        );
+        return pwd.length >= 8 && hasLetter && hasNumber && hasSpecial;
     };
 
     const handleSignup = async () => {
         const cleanName = name.trim();
         const cleanEmail = email.trim();
 
-        if (
-            !cleanName ||
-            !cleanEmail ||
-            !password ||
-            !confirmPassword ||
-            !role
-        ) {
+        if (!cleanName || !cleanEmail || !password || !confirmPassword || !role) {
             setError("Fill all fields and select account type.");
             return;
         }
@@ -70,11 +59,7 @@ export default function SignupScreen({ navigation }: any) {
             setError(null);
 
             const userCredential =
-                await createUserWithEmailAndPassword(
-                    auth,
-                    cleanEmail,
-                    password
-                );
+                await createUserWithEmailAndPassword(auth, cleanEmail, password);
 
             const uid = userCredential.user.uid;
 
@@ -85,12 +70,10 @@ export default function SignupScreen({ navigation }: any) {
                 createdAt: new Date().toISOString(),
             });
 
-            // SEND TO LOGIN ONLY
             navigation.reset({
                 index: 0,
                 routes: [{ name: "Login" }],
             });
-
         } catch (e: any) {
             setError(e?.message || "Signup failed");
         } finally {
@@ -105,16 +88,14 @@ export default function SignupScreen({ navigation }: any) {
         >
             <ScrollView contentContainerStyle={styles.content}>
                 <View style={styles.card}>
-
-                    <Text style={styles.title}>
-                        Create Account
-                    </Text>
+                    <Text style={styles.title}>Create Account</Text>
 
                     <TextInput
                         style={styles.input}
                         placeholder="Name"
                         value={name}
                         onChangeText={setName}
+                        placeholderTextColor="#A0A0A0"
                     />
 
                     <TextInput
@@ -123,25 +104,22 @@ export default function SignupScreen({ navigation }: any) {
                         value={email}
                         onChangeText={setEmail}
                         autoCapitalize="none"
+                        placeholderTextColor="#A0A0A0"
                     />
 
                     <View style={styles.roleContainer}>
-
                         <TouchableOpacity
                             style={[
                                 styles.roleButton,
-                                role === "renter" &&
-                                styles.roleSelected,
+                                role === "renter" && styles.roleSelected,
                             ]}
                             onPress={() => setRole("renter")}
                         >
                             <Text
-                                style={{
-                                    color:
-                                        role === "renter"
-                                            ? "white"
-                                            : "black",
-                                }}
+                                style={[
+                                    styles.roleText,
+                                    role === "renter" && styles.roleTextActive,
+                                ]}
                             >
                                 Renter
                             </Text>
@@ -150,25 +128,19 @@ export default function SignupScreen({ navigation }: any) {
                         <TouchableOpacity
                             style={[
                                 styles.roleButton,
-                                role === "landlord" &&
-                                styles.roleSelected,
+                                role === "landlord" && styles.roleSelected,
                             ]}
-                            onPress={() =>
-                                setRole("landlord")
-                            }
+                            onPress={() => setRole("landlord")}
                         >
                             <Text
-                                style={{
-                                    color:
-                                        role === "landlord"
-                                            ? "white"
-                                            : "black",
-                                }}
+                                style={[
+                                    styles.roleText,
+                                    role === "landlord" && styles.roleTextActive,
+                                ]}
                             >
                                 Landlord
                             </Text>
                         </TouchableOpacity>
-
                     </View>
 
                     <TextInput
@@ -177,6 +149,7 @@ export default function SignupScreen({ navigation }: any) {
                         value={password}
                         onChangeText={setPassword}
                         secureTextEntry
+                        placeholderTextColor="#A0A0A0"
                     />
 
                     <TextInput
@@ -185,78 +158,44 @@ export default function SignupScreen({ navigation }: any) {
                         value={confirmPassword}
                         onChangeText={setConfirmPassword}
                         secureTextEntry
+                        placeholderTextColor="#A0A0A0"
                     />
 
                     <TouchableOpacity
                         style={styles.passwordHintContainer}
-                        onPress={() =>
-                            setShowPasswordRules(
-                                !showPasswordRules
-                            )
-                        }
+                        onPress={() => setShowPasswordRules(!showPasswordRules)}
                     >
-                        <Text style={styles.link}>
-                            Password requirements
-                        </Text>
+                        <Text style={styles.link}>Password requirements</Text>
                     </TouchableOpacity>
 
                     {showPasswordRules && (
                         <View style={styles.rules}>
-                            <Text>
-                                • Minimum 8 characters
-                            </Text>
-
-                            <Text>
-                                • At least 1 letter
-                            </Text>
-
-                            <Text>
-                                • At least 1 number
-                            </Text>
-
-                            <Text>
-                                • At least 1 special
-                                character
-                            </Text>
+                            <Text style={styles.ruleText}>• Minimum 8 characters</Text>
+                            <Text style={styles.ruleText}>• At least 1 letter</Text>
+                            <Text style={styles.ruleText}>• At least 1 number</Text>
+                            <Text style={styles.ruleText}>• At least 1 special character</Text>
                         </View>
                     )}
 
-                    {error && (
-                        <Text style={styles.error}>
-                            {error}
-                        </Text>
-                    )}
+                    {error && <Text style={styles.error}>{error}</Text>}
 
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={handleSignup}
-                    >
+                    <TouchableOpacity style={styles.button} onPress={handleSignup}>
                         <Text style={styles.buttonText}>
-                            {loading
-                                ? "Creating..."
-                                : "Sign Up"}
+                            {loading ? "Creating..." : "Create account"}
                         </Text>
                     </TouchableOpacity>
 
                     <View style={styles.loginContainer}>
-                        <TouchableOpacity
-                            onPress={() =>
-                                navigation.goBack()
-                            }
-                        >
+                        <TouchableOpacity onPress={() => navigation.goBack()}>
                             <Text style={styles.link}>
-                                Already have an account?
-                                Login
+                                Already have an account? Login
                             </Text>
                         </TouchableOpacity>
                     </View>
 
                     <Text style={styles.disclaimer}>
-                        By signing up, I agree to
-                        Hunter Terms & Conditions and
-                        Privacy Policy.
+                        By signing up, I agree to Hunter Terms & Conditions and Privacy Policy.
                     </Text>
-
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -266,7 +205,7 @@ export default function SignupScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: "#FFFFFF",
     },
 
     content: {
@@ -280,85 +219,105 @@ const styles = StyleSheet.create({
     },
 
     title: {
-        fontSize: sizes.large,
-        fontWeight: "700",
-        marginBottom: 20,
+        fontSize: 30,
+        fontWeight: "800",
         textAlign: "center",
+        marginBottom: 24,
+        color: "#111827",
+        letterSpacing: -0.5,
     },
 
     input: {
-        borderWidth: 1,
-        borderColor: "#ddd",
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 10,
+        backgroundColor: "#F3F4F6",
+        padding: 16,
+        borderRadius: 14,
+        marginBottom: 12,
+        fontSize: 16,
+        color: "#111827",
     },
 
     roleContainer: {
         flexDirection: "row",
-        justifyContent: "space-between",
-        marginBottom: 15,
+        gap: 12,
+        marginBottom: 16,
     },
 
     roleButton: {
         flex: 1,
-        padding: 12,
-        marginHorizontal: 5,
-        borderWidth: 1,
-        borderColor: "#ccc",
-        borderRadius: 10,
+        paddingVertical: 14,
+        borderRadius: 14,
+        backgroundColor: "#F3F4F6",
         alignItems: "center",
     },
 
     roleSelected: {
-        backgroundColor:
-            colors.primaryBlue,
-        borderColor:
-            colors.primaryBlue,
+        backgroundColor: "#E5EBFB",
+        borderWidth: 1,
+        borderColor: colors.primaryBlue,
+    },
+
+    roleText: {
+        color: "#6B7280",
+        fontWeight: "500",
+    },
+
+    roleTextActive: {
+        color: colors.primaryBlue,
+        fontWeight: "700",
     },
 
     passwordHintContainer: {
         alignSelf: "flex-start",
-        marginBottom: 5,
+        marginBottom: 8,
     },
 
     link: {
         color: colors.primaryBlue,
-        fontSize: 12,
+        fontSize: 13,
+        fontWeight: "600",
     },
 
     rules: {
         marginBottom: 10,
+        backgroundColor: "#F9FAFB",
+        padding: 12,
+        borderRadius: 12,
     },
 
-    disclaimer: {
-        fontSize: 12,
-        marginTop: 15,
-        textAlign: "center",
-        color: "#666",
+    ruleText: {
+        fontSize: 13,
+        color: "#4B5563",
+    },
+
+    error: {
+        color: "#DC2626",
+        marginTop: 10,
+        marginBottom: 10,
     },
 
     button: {
-        backgroundColor:
-            colors.primaryBlue,
-        padding: 15,
-        borderRadius: 10,
+        backgroundColor: colors.deepPurple,
+        paddingVertical: 18,
+        borderRadius: 999,
         alignItems: "center",
         marginTop: 10,
     },
 
     buttonText: {
         color: "white",
-        fontWeight: "600",
-    },
-
-    error: {
-        color: "red",
-        marginTop: 10,
+        fontWeight: "700",
+        fontSize: 16,
     },
 
     loginContainer: {
         alignItems: "center",
-        marginTop: 15,
+        marginTop: 16,
+    },
+
+    disclaimer: {
+        fontSize: 12,
+        marginTop: 18,
+        textAlign: "center",
+        color: "#6B7280",
     },
 });
