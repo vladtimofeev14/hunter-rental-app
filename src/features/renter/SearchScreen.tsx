@@ -31,7 +31,7 @@ export default function SearchScreen({ navigation }: any) {
   }, []);
 
   const filtered = useMemo(() => {
-    let results = [...listings];
+    let results = listings.filter((l) => !l.status || l.status === "Active");
 
     if (query.trim()) {
       const q = query.toLowerCase().trim();

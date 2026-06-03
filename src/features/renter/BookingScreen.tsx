@@ -1,12 +1,12 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function BookingScreen({ route }: any) {
   const listingId = route?.params?.listingId;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container}>          
       <View style={styles.card}>
         <Text style={styles.title}>Booking Screen</Text>
 

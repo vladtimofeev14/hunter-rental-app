@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     KeyboardAvoidingView,
     Platform,
@@ -13,14 +13,40 @@ import {
 
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../../config/firebase";
 import { colors } from "../../styles/globalStyles";
+
+const REMEMBER_LOGIN_KEY = "hunterRememberLogin";
 
 export default function LoginScreen({ navigation }: any) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const loadRememberedLogin = async () => {
+            try {
+                const savedLogin = await AsyncStorage.getItem(REMEMBER_LOGIN_KEY);
+
+                if (!savedLogin) return;
+
+                const parsedLogin = JSON.parse(savedLogin);
+
+                if (parsedLogin?.email && parsedLogin?.password) {
+                    setEmail(parsedLogin.email);
+                    setPassword(parsedLogin.password);
+                    setRememberMe(true);
+                }
+            } catch {
+                await AsyncStorage.removeItem(REMEMBER_LOGIN_KEY);
+            }
+        };
+
+        loadRememberedLogin();
+    }, []);
 
     const handleLogin = async () => {
         const cleanEmail = email.trim();
@@ -45,6 +71,18 @@ export default function LoginScreen({ navigation }: any) {
             const userSnap = await getDoc(doc(db, "users", uid));
             const role = userSnap.exists() ? userSnap.data()?.role : null;
 
+            if (rememberMe) {
+                await AsyncStorage.setItem(
+                    REMEMBER_LOGIN_KEY,
+                    JSON.stringify({
+                        email: cleanEmail,
+                        password,
+                    })
+                );
+            } else {
+                await AsyncStorage.removeItem(REMEMBER_LOGIN_KEY);
+            }
+
             if (role === "renter") {
                 navigation.reset({
                     index: 0,
@@ -53,7 +91,7 @@ export default function LoginScreen({ navigation }: any) {
             } else if (role === "landlord") {
                 navigation.reset({
                     index: 0,
-                    routes: [{ name: "LandlordSetupScreen" }],
+                    routes: [{ name: "LandlordTabs" }],
                 });
             } else {
                 setError("User role not found.");
@@ -97,6 +135,22 @@ export default function LoginScreen({ navigation }: any) {
                         secureTextEntry
                         placeholderTextColor="#A0A0A0"
                     />
+
+                    <TouchableOpacity
+                        style={styles.rememberRow}
+                        onPress={() => setRememberMe(!rememberMe)}
+                    >
+                        <View
+                            style={[
+                                styles.checkbox,
+                                rememberMe && styles.checkboxSelected,
+                            ]}
+                        >
+                            {rememberMe && <Text style={styles.checkboxMark}>✓</Text>}
+                        </View>
+
+                        <Text style={styles.rememberText}>Remember Me</Text>
+                    </TouchableOpacity>
 
                     {error && <Text style={styles.error}>{error}</Text>}
 
@@ -162,6 +216,43 @@ const styles = StyleSheet.create({
         color: "#111827",
         textAlignVertical: "center",
         includeFontPadding: false,
+    },
+
+    rememberRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        marginTop: 2,
+        marginBottom: 14,
+    },
+
+    checkbox: {
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: "#9CA3AF",
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: 8,
+    },
+
+    checkboxSelected: {
+        backgroundColor: colors.deepPurple,
+        borderColor: colors.deepPurple,
+    },
+
+    checkboxMark: {
+        color: "#fff",
+        fontSize: 14,
+        fontWeight: "800",
+        lineHeight: 18,
+    },
+
+    rememberText: {
+        color: "#111827",
+        fontSize: 14,
+        fontWeight: "600",
     },
 
     button: {

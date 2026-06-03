@@ -1,82 +1,88 @@
 import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
+  Alert,
+  Pressable,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { auth, db } from "../../config/firebase";
+import { SymbolView } from "expo-symbols";
 import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../../config/firebase";
 import { colors } from "../../styles/globalStyles";
 
-export default function UserProfileScreen({ navigation }: any) {
-  const [prefs, setPrefs] = useState<any>(null);
+export default function LandlordProfileScreen({ navigation }: any) {
+  const [profile, setProfile] = useState<any>(null);
   const user = auth.currentUser;
 
   useEffect(() => {
-    const load = async () => {
+    const loadProfile = async () => {
       if (!user) return;
 
       const snap = await getDoc(doc(db, "users", user.uid));
 
       if (snap.exists()) {
-        setPrefs(snap.data()?.renterPreferences || null);
+        setProfile(snap.data());
       }
     };
 
-    load();
+    loadProfile();
   }, []);
 
-  const logout = async () => {
-    await auth.signOut();
+  const logout = () => {
+    Alert.alert("Log out", "Are you sure you want to log out?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Log out",
+        style: "destructive",
+        onPress: async () => {
+          await auth.signOut();
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Login" }],
+          });
+        },
+      },
+    ]);
   };
+
+  const displayName =
+    profile?.name ||
+    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") ||
+    user?.displayName ||
+    "Landlord";
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Text style={styles.backButtonText}>‹</Text>
+      </Pressable>
 
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View style={styles.avatar}>
-            <Ionicons name="person" size={22} color="#fff" />
+            <SymbolView name="person" size={22} tintColor="#fff" />
           </View>
 
           <Text style={styles.title}>Profile</Text>
-          <Text style={styles.subtitle}>Your renter settings</Text>
+          <Text style={styles.subtitle}>Your landlord account</Text>
         </View>
 
-        {/* PREF SUMMARY */}
         <View style={styles.card}>
-          {!prefs ? (
-            <Text style={styles.empty}>No preferences found</Text>
-          ) : (
-            <>
-              <Text style={styles.item}>Budget: ${prefs.budget}</Text>
-              <Text style={styles.item}>Campus: {prefs.campus}</Text>
-              <Text style={styles.item}>Lease: {prefs.leaseDuration} months</Text>
-              <Text style={styles.item}>Housing: {prefs.housingType}</Text>
-              <Text style={styles.item}>
-                Furnished: {prefs.furnished ? "Yes" : "No"}
-              </Text>
-            </>
-          )}
+          <Text style={styles.item}>Name: {displayName}</Text>
+          <Text style={styles.item}>Email: {profile?.email || user?.email}</Text>
+          <Text style={styles.item}>Role: {profile?.role || "landlord"}</Text>
         </View>
 
-        {/* EDIT BUTTON */}
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => navigation.navigate("RenterPreferencesScreen")}
-        >
-          <Text style={styles.primaryText}>Edit Preferences</Text>
-        </TouchableOpacity>
-
-        {/* LOGOUT */}
         <TouchableOpacity style={styles.secondaryButton} onPress={logout}>
           <Text style={styles.secondaryText}>Log out</Text>
         </TouchableOpacity>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -86,6 +92,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+  },
+
+  backButton: {
+    position: "absolute",
+    top: 52,
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+
+  backButtonText: {
+    fontSize: 32,
+    lineHeight: 34,
+    color: "#111827",
   },
 
   content: {
@@ -132,26 +157,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#374151",
     marginBottom: 6,
-  },
-
-  empty: {
-    fontSize: 13,
-    color: "#9CA3AF",
-    textAlign: "center",
-  },
-
-  primaryButton: {
-    backgroundColor: colors.deepPurple,
-    paddingVertical: 18,
-    borderRadius: 999,
-    alignItems: "center",
-    marginBottom: 12,
-  },
-
-  primaryText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "700",
   },
 
   secondaryButton: {

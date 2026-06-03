@@ -23,10 +23,13 @@ export default function MapScreen({ route, navigation }: any) {
 
   // center map based on first listing if available
   const initialRegion = useMemo(() => {
-    if (listings.length > 0 && listings[0]?.latitude && listings[0]?.longitude) {
+    const firstLatitude = listings[0]?.lat ?? listings[0]?.latitude;
+    const firstLongitude = listings[0]?.lng ?? listings[0]?.longitude;
+
+    if (listings.length > 0 && firstLatitude && firstLongitude) {
       return {
-        latitude: listings[0].latitude,
-        longitude: listings[0].longitude,
+        latitude: firstLatitude,
+        longitude: firstLongitude,
         latitudeDelta: 0.08,
         longitudeDelta: 0.08,
       };
@@ -43,14 +46,17 @@ export default function MapScreen({ route, navigation }: any) {
       >
         {/* LISTINGS MARKERS */}
         {listings.map((item: any) => {
-          if (!item.latitude || !item.longitude) return null;
+          const latitude = item.lat ?? item.latitude;
+          const longitude = item.lng ?? item.longitude;
+
+          if (!latitude || !longitude) return null;
 
           return (
             <Marker
               key={item.id}
               coordinate={{
-                latitude: item.latitude,
-                longitude: item.longitude,
+                latitude,
+                longitude,
               }}
               title={item.name}
               description={`${item.city} · $${item.price?.amount}`}
@@ -63,6 +69,10 @@ export default function MapScreen({ route, navigation }: any) {
           );
         })}
       </MapView>
+
+      <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Text style={styles.backButtonText}>‹</Text>
+      </Pressable>
 
       {/* INFO PANEL (optional preview layer) */}
       <View style={styles.bottomHint}>
@@ -82,6 +92,24 @@ const styles = StyleSheet.create({
   map: {
     width: Dimensions.get("window").width,
     height: "100%",
+  },
+
+  backButton: {
+    position: "absolute",
+    top: 52,
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  backButtonText: {
+    fontSize: 32,
+    lineHeight: 34,
+    color: "#111827",
   },
 
   bottomHint: {

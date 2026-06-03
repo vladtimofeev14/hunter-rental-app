@@ -10,7 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { auth, db } from "../../config/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { colors } from "../../styles/globalStyles";
-import { Ionicons } from "@expo/vector-icons";
+import { SymbolView, type SFSymbol } from "expo-symbols";
 
 export default function RenterDashboardScreen({ navigation }: any) {
   const [profile, setProfile] = useState<any>(null);
@@ -18,6 +18,7 @@ export default function RenterDashboardScreen({ navigation }: any) {
   const user = auth.currentUser;
 
   const displayName =
+    profile?.firstName ||
     profile?.name ||
     user?.displayName ||
     user?.email?.split("@")[0] ||
@@ -27,7 +28,7 @@ export default function RenterDashboardScreen({ navigation }: any) {
     const loadProfile = async () => {
       if (!user) return;
 
-      const snap = await getDoc(doc(db, "renterPreferences", user.uid));
+      const snap = await getDoc(doc(db, "users", user.uid));
       if (snap.exists()) setProfile(snap.data());
     };
 
@@ -51,28 +52,33 @@ export default function RenterDashboardScreen({ navigation }: any) {
     {
       label: "Matches",
       value: mockData.recommendations.length,
-      icon: "search-outline",
+      icon: "magnifyingglass",
       screen: "Search",
     },
     {
       label: "Bookings",
       value: mockData.bookings.length,
-      icon: "calendar-outline",
+      icon: "calendar",
       screen: "Map",
     },
     {
       label: "Applications",
       value: mockData.applications.length,
-      icon: "document-text-outline",
+      icon: "doc.text",
       screen: "ApplicationsScreen",
     },
     {
       label: "Saved",
       value: 3,
-      icon: "heart-outline",
+      icon: "heart",
       screen: "Saved",
     },
-  ];
+  ] as Array<{
+    label: string;
+    value: number;
+    icon: SFSymbol;
+    screen: string;
+  }>;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -83,7 +89,7 @@ export default function RenterDashboardScreen({ navigation }: any) {
         {/* HEADER */}
         <View style={styles.headerRow}>
           <View style={styles.avatar}>
-            <Ionicons name="person" size={18} color="#fff" />
+            <SymbolView name="person" size={18} tintColor="#fff" />
           </View>
 
           <View style={styles.greetingContainer}>
@@ -94,10 +100,10 @@ export default function RenterDashboardScreen({ navigation }: any) {
           </View>
 
           <TouchableOpacity
-            onPress={() => navigation.navigate("UserProfile")}
+            onPress={() => navigation.navigate("RenterProfileScreen")}
             style={styles.settingsBtn}
           >
-            <Ionicons name="settings-outline" size={22} color="#111827" />
+            <SymbolView name="gearshape" size={22} tintColor="#111827" />
           </TouchableOpacity>
         </View>
 
@@ -109,7 +115,7 @@ export default function RenterDashboardScreen({ navigation }: any) {
               style={styles.metricCard}
               onPress={() => navigation.navigate(m.screen)}
             >
-              <Ionicons name={m.icon as any} size={22} color={colors.primaryBlue} />
+              <SymbolView name={m.icon} size={22} tintColor={colors.primaryBlue} />
               <Text style={styles.metricValue}>{m.value}</Text>
               <Text style={styles.metricLabel}>{m.label}</Text>
             </TouchableOpacity>
@@ -150,7 +156,7 @@ export default function RenterDashboardScreen({ navigation }: any) {
             <Text style={styles.cardTitle}>{item.title}</Text>
 
             <View style={styles.pendingRow}>
-              <Ionicons name="time-outline" size={14} color="#F59E0B" />
+              <SymbolView name="clock" size={14} tintColor="#F59E0B" />
               <Text style={styles.pending}>{item.status}</Text>
             </View>
           </TouchableOpacity>

@@ -3,23 +3,15 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { SymbolView, type SFSymbol } from "expo-symbols";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../styles/globalStyles";
-import RenterDashboardScreen from "../features/renter/RenterDashboardScreen";
-import SearchScreen from "../features/renter/SearchScreen";
-import MapScreen from "../features/renter/MapScreen";
-import SavedListingsScreen from "../features/renter/SavedListingsScreen";
-import NotificationsScreen from "../features/renter/NotificationsScreen";
+import LandlordDashboardScreen from "../features/landlord/LandlordDashboardScreen";
 
 const Tab = createBottomTabNavigator();
 
 const tabIcons: Record<string, { active: SFSymbol; inactive: SFSymbol }> = {
   Home: { active: "house.fill", inactive: "house" },
-  Search: { active: "magnifyingglass", inactive: "magnifyingglass" },
-  Map: { active: "map.fill", inactive: "map" },
-  Saved: { active: "heart.fill", inactive: "heart" },
-  Notifications: { active: "bell.fill", inactive: "bell" },
 };
 
-export default function RenterTabs() {
+export default function LandlordTabs() {
   const insets = useSafeAreaInsets();
 
   return (
@@ -27,10 +19,8 @@ export default function RenterTabs() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: true,
-
         tabBarActiveTintColor: colors.primaryBlue,
         tabBarInactiveTintColor: colors.textSecondary,
-
         tabBarStyle: {
           height: 75 + insets.bottom,
           backgroundColor: "#FFFFFF",
@@ -45,12 +35,10 @@ export default function RenterTabs() {
           shadowOffset: { width: 0, height: -3 },
           elevation: 10,
         },
-
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "600",
         },
-
         tabBarIcon: ({ color, focused }) => {
           const iconName = focused
             ? tabIcons[route.name]?.active
@@ -67,11 +55,7 @@ export default function RenterTabs() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={RenterDashboardScreen} />
-      <Tab.Screen name="Search" component={SearchScreen} />
-      <Tab.Screen name="Map" component={MapScreen} />
-      <Tab.Screen name="Saved" component={SavedListingsScreen} />
-      <Tab.Screen name="Notifications" component={NotificationsScreen} />
+      <Tab.Screen name="Home" component={LandlordDashboardScreen} />
     </Tab.Navigator>
   );
 }

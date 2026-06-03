@@ -1,11 +1,65 @@
-import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useState } from "react";
+import {
+    Alert,
+    View,
+    Text,
+    Image,
+    TouchableOpacity,
+    StyleSheet,
+    Pressable,
+} from "react-native";
+import { SymbolView } from "expo-symbols";
+import { arrayRemove, arrayUnion, doc, updateDoc } from "firebase/firestore";
+import { auth, db } from "../../../config/firebase";
+import { colors } from "../../../styles/globalStyles";
 
-export default function ListingCard({ item, navigation }: any) {
+export default function ListingCard({
+    item,
+    navigation,
+    isFavorite = false,
+    onFavoriteChange,
+}: any) {
+    const [favorite, setFavorite] = useState(isFavorite);
+
     const enrichedItem = {
         ...item,
-        latitude: 43.66 + Math.random() * 0.01,
-        longitude: -79.38 + Math.random() * 0.01,
+        latitude: item.lat ?? item.latitude ?? 43.66 + Math.random() * 0.01,
+        longitude: item.lng ?? item.longitude ?? -79.38 + Math.random() * 0.01,
+    };
+
+    const handleFavorite = async () => {
+        const user = auth.currentUser;
+
+        if (!user || !item?.id) return;
+
+        if (favorite) {
+            Alert.alert("Remove from Favorites?", "", [
+                {
+                    text: "Cancel",
+                    style: "cancel",
+                },
+                {
+                    text: "Remove",
+                    style: "destructive",
+                    onPress: async () => {
+                        await updateDoc(doc(db, "users", user.uid), {
+                            favoritesID: arrayRemove(item.id),
+                        });
+
+                        setFavorite(false);
+                        onFavoriteChange?.(false);
+                    },
+                },
+            ]);
+            return;
+        }
+
+        await updateDoc(doc(db, "users", user.uid), {
+            favoritesID: arrayUnion(item.id),
+        });
+
+        setFavorite(true);
+        onFavoriteChange?.(true);
     };
 
     return (
@@ -13,11 +67,25 @@ export default function ListingCard({ item, navigation }: any) {
             style={styles.card}
             onPress={() =>
                 navigation.navigate("PropertyDetailsScreen", {
-                    listing: item,
+                    listing: enrichedItem,
                 })
             }
         >
             <Image source={{ uri: item.images?.[0] }} style={styles.image} />
+
+            <Pressable
+                style={styles.favoriteButton}
+                onPress={(event) => {
+                    event.stopPropagation();
+                    handleFavorite();
+                }}
+            >
+                <SymbolView
+                    name={favorite ? "heart.fill" : "heart"}
+                    size={22}
+                    tintColor={favorite ? colors.primaryBlue : "#111827"}
+                />
+            </Pressable>
 
             <View style={styles.row}>
                 {/* LEFT */}
@@ -66,6 +134,18 @@ const styles = StyleSheet.create({
     image: {
         width: "100%",
         height: 140,
+    },
+
+    favoriteButton: {
+        position: "absolute",
+        top: 10,
+        right: 10,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: "#fff",
+        alignItems: "center",
+        justifyContent: "center",
     },
 
     row: {
