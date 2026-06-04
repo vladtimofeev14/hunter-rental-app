@@ -12,35 +12,28 @@ import { auth, db } from "../../config/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { colors } from "../../styles/globalStyles";
 
-export default function ApplicationsScreen() {
-  const [applications, setApplications] = useState<any[]>([]);
+export default function BookingsListScreen() {
+  const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       const user = auth.currentUser;
-      if (!user) {
-        setLoading(false);
-        return;
-      }
+      if (!user) return;
 
       try {
         const q = query(
-          collection(db, "applications"),
+          collection(db, "bookings"),
           where("userId", "==", user.uid)
         );
 
         const snap = await getDocs(q);
 
-        const data = snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }));
-
-        setApplications(data);
+        setBookings(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        );
       } catch (e) {
-        console.log("Applications load error:", e);
-        setApplications([]);
+        console.log("Bookings error:", e);
       } finally {
         setLoading(false);
       }
@@ -48,17 +41,6 @@ export default function ApplicationsScreen() {
 
     load();
   }, []);
-
-  const getStatusStyle = (status?: string) => {
-    switch (status) {
-      case "accepted":
-        return { color: "green" };
-      case "rejected":
-        return { color: "red" };
-      default:
-        return { color: "#F59E0B" };
-    }
-  };
 
   if (loading) {
     return (
@@ -70,32 +52,27 @@ export default function ApplicationsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Applications</Text>
+      <Text style={styles.title}>Upcoming viewings</Text>
 
-      {applications.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>No applications yet</Text>
+      {bookings.length === 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.empty}>No bookings yet</Text>
         </View>
       ) : (
         <FlatList
-          data={applications}
+          data={bookings}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: 120 }}
           renderItem={({ item }) => (
             <View style={styles.card}>
-              {item.listingImage ? (
-                <Image
-                  source={{ uri: item.listingImage }}
-                  style={styles.image}
-                />
+              {item.image ? (
+                <Image source={{ uri: item.image }} style={styles.image} />
               ) : null}
 
-              <Text style={styles.name}>
-                {item.listingTitle || "Application"}
-              </Text>
+              <Text style={styles.name}>{item.title}</Text>
 
-              <Text style={[styles.statusText, getStatusStyle(item.status)]}>
-                {item.status || "pending"}
+              <Text style={styles.sub}>
+                {item.date} • {item.time}
               </Text>
             </View>
           )}
@@ -122,8 +99,8 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: "#fff",
-    padding: 14,
     borderRadius: 14,
+    padding: 14,
     marginBottom: 10,
   },
 
@@ -137,23 +114,18 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 15,
     fontWeight: "700",
+    color: colors.black,
   },
 
-  statusText: {
-    marginTop: 6,
+  sub: {
     fontSize: 12,
-    fontWeight: "700",
+    color: colors.textSecondary,
+    marginTop: 4,
   },
 
-  emptyCard: {
-    backgroundColor: "#fff",
-    padding: 14,
-    borderRadius: 14,
-  },
-
-  emptyText: {
+  empty: {
+    color: colors.textSecondary,
     textAlign: "center",
-    color: "#6B7280",
   },
 
   center: {

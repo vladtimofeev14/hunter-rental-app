@@ -1,25 +1,40 @@
 import React, { useEffect, useState, useMemo } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  StyleSheet,
-  Pressable,
-} from "react-native";
+import { View, TextInput, FlatList, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../config/firebase";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../../config/firebase";
 import ListingCard from "./components/ListingCard";
+import FilterBar from "./components/FilterBar";
+import { Filters } from "./components/types";
+
+const getDistanceKm = (
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) ** 2;
+
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+};
 
 export default function SearchScreen({ navigation }: any) {
   const [listings, setListings] = useState<any[]>([]);
+  const [prefs, setPrefs] = useState<any>(null);
   const [query, setQuery] = useState("");
 
-  const [filters, setFilters] = useState({
-    bedrooms: null as number | null,
-    furnished: null as boolean | null,
-    sortBy: "default" as "default" | "price",
+  const [filters, setFilters] = useState<Filters>({
+    bedrooms: null,
+    furnished: null,
+    sortBy: "match",
   });
 
   useEffect(() => {
@@ -30,17 +45,63 @@ export default function SearchScreen({ navigation }: any) {
     load();
   }, []);
 
-  const filtered = useMemo(() => {
-    let results = [...listings];
+  useEffect(() => {
+    const loadPrefs = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
 
-    if (query.trim()) {
-      const q = query.toLowerCase().trim();
-      results = results.filter((l) =>
-        [l.name, l.city, l.address]
-          .filter(Boolean)
-          .some((f) => f.toLowerCase().includes(q))
-      );
-    }
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if (snap.exists()) {
+        setPrefs(snap.data()?.renterPreferences || null);
+      }
+    };
+    loadPrefs();
+  }, []);
+
+  const ranked = useMemo(() => {
+    if (!listings.length) return [];
+
+    let results = listings.map((l) => {
+      let score = 0;
+
+      const price = l.price?.amount ?? Infinity;
+
+      const distance =
+        prefs?.userLat && prefs?.userLng && l.lat && l.lng
+          ? getDistanceKm(
+            prefs.userLat,
+            prefs.userLng,
+            l.lat,
+            l.lng
+          )
+          : null;
+
+      if (prefs?.budget && price <= prefs.budget) score += 40;
+
+      if (distance !== null) {
+        score += Math.max(0, 30 - distance * 2);
+      }
+
+      if (prefs?.bedrooms && l.bedrooms === prefs.bedrooms) {
+        score += 10;
+      }
+
+      if (prefs?.furnished !== undefined && l.furnished === prefs.furnished) {
+        score += 10;
+      }
+
+      if (query.trim()) {
+        const q = query.toLowerCase();
+        if (
+          (l.city || "").toLowerCase().includes(q) ||
+          (l.address || "").toLowerCase().includes(q)
+        ) {
+          score += 10;
+        }
+      }
+
+      return { ...l, score, distance, price };
+    });
 
     if (filters.bedrooms !== null) {
       results = results.filter((l) => l.bedrooms === filters.bedrooms);
@@ -51,30 +112,18 @@ export default function SearchScreen({ navigation }: any) {
     }
 
     if (filters.sortBy === "price") {
-      results.sort((a, b) => a.price.amount - b.price.amount);
+      results.sort((a, b) => a.price - b.price);
+    } else if (filters.sortBy === "distance") {
+      results.sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
+    } else {
+      results.sort((a, b) => b.score - a.score);
     }
 
     return results;
-  }, [listings, query, filters]);
-
-  const Chip = ({ active, onPress, children }: any) => (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        active && styles.chipActive,
-        pressed && styles.chipPressed,
-      ]}
-    >
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-        {children}
-      </Text>
-    </Pressable>
-  );
+  }, [listings, prefs, query, filters]);
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* SEARCH */}
       <View style={styles.searchBox}>
         <TextInput
           placeholder="Search city, address..."
@@ -84,89 +133,10 @@ export default function SearchScreen({ navigation }: any) {
         />
       </View>
 
-      {/* FILTERS */}
-      <View style={styles.filterBar}>
-        <Chip
-          active={filters.sortBy === "price"}
-          onPress={() =>
-            setFilters((p) => ({
-              ...p,
-              sortBy: p.sortBy === "price" ? "default" : "price",
-            }))
-          }
-        >
-          Price
-        </Chip>
+      <FilterBar filters={filters} setFilters={setFilters} />
 
-        <Chip
-          active={filters.bedrooms === 1}
-          onPress={() =>
-            setFilters((p) => ({
-              ...p,
-              bedrooms: p.bedrooms === 1 ? null : 1,
-            }))
-          }
-        >
-          1BR
-        </Chip>
-
-        <Chip
-          active={filters.bedrooms === 2}
-          onPress={() =>
-            setFilters((p) => ({
-              ...p,
-              bedrooms: p.bedrooms === 2 ? null : 2,
-            }))
-          }
-        >
-          2BR
-        </Chip>
-
-        <Chip
-          active={filters.furnished === true}
-          onPress={() =>
-            setFilters((p) => ({
-              ...p,
-              furnished: p.furnished === true ? null : true,
-            }))
-          }
-        >
-          Furnished
-        </Chip>
-
-        <Pressable
-          onPress={() => {
-            setQuery("");
-            setFilters({
-              bedrooms: null,
-              furnished: null,
-              sortBy: "default",
-            });
-          }}
-          style={({ pressed }) => [
-            styles.chip,
-            styles.resetChip,
-            pressed && styles.chipPressed,
-          ]}
-        >
-          <Text style={styles.chipText}>Reset</Text>
-        </Pressable>
-      </View>
-
-      {/* MAP BUTTON */}
-      <Pressable
-        onPress={() =>
-          navigation.navigate("MapScreen", {
-            listings: filtered,
-          })
-        }
-      >
-        <Text>Open Map</Text>
-      </Pressable>
-
-      {/* LIST */}
       <FlatList
-        data={filtered}
+        data={ranked}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <ListingCard item={item} navigation={navigation} />
@@ -178,11 +148,7 @@ export default function SearchScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F6F7FB",
-  },
-
+  container: { flex: 1, backgroundColor: "#F6F7FB" },
   searchBox: {
     margin: 12,
     backgroundColor: "#fff",
@@ -191,44 +157,5 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: "center",
   },
-
-  searchInput: {
-    fontSize: 14,
-  },
-
-  filterBar: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    paddingHorizontal: 12,
-    marginBottom: 8,
-  },
-
-  chip: {
-    backgroundColor: "#E5E7EB",
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-  },
-
-  chipPressed: {
-    opacity: 0.7,
-  },
-
-  chipText: {
-    fontSize: 12,
-    color: "#111",
-  },
-
-  chipActive: {
-    backgroundColor: "#111827",
-  },
-
-  chipTextActive: {
-    color: "#fff",
-  },
-
-  resetChip: {
-    backgroundColor: "#F3F4F6",
-  },
+  searchInput: { fontSize: 14 },
 });

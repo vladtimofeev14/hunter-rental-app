@@ -1,8 +1,9 @@
+// This is a place holder. It just has a button to navigative to renter - BookingsListScreen
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function BookingScreen({ route }: any) {
+export default function BookingScreen({ route, navigation }: any) {
   const listingId = route?.params?.listingId;
 
   return (
@@ -10,15 +11,22 @@ export default function BookingScreen({ route }: any) {
       <View style={styles.card}>
         <Text style={styles.title}>Booking Screen</Text>
 
-        <Text style={styles.meta}>
-          Listing ID:
-        </Text>
-
+        <Text style={styles.meta}>Listing ID:</Text>
         <Text style={styles.id}>{listingId}</Text>
 
         <Text style={styles.note}>
           (Booking logic will be added later)
         </Text>
+
+        {/* BUTTON */}
+        <Pressable
+          style={styles.button}
+          onPress={() => navigation.navigate("BookingsListScreen")}
+        >
+          <Text style={styles.buttonText}>
+            View My Bookings
+          </Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -58,5 +66,18 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 12,
     color: "#9CA3AF",
+  },
+
+  button: {
+    marginTop: 25,
+    backgroundColor: "#111827",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+
+  buttonText: {
+    color: "#fff",
+    fontWeight: "700",
   },
 });

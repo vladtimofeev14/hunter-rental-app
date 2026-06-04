@@ -8,7 +8,7 @@ import {
     Dimensions,
     TouchableOpacity,
 } from "react-native";
-import { colors, sizes } from "../../styles/globalStyles"; //
+import { colors, sizes } from "../../styles/globalStyles"; 
 
 const { width } = Dimensions.get("window");
 

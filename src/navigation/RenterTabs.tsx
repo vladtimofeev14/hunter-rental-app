@@ -3,10 +3,10 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../styles/globalStyles";
+
 import RenterDashboardScreen from "../features/renter/RenterDashboardScreen";
 import SearchScreen from "../features/renter/SearchScreen";
 import MapScreen from "../features/renter/MapScreen";
-import SavedListingsScreen from "../features/renter/SavedListingsScreen";
 import NotificationsScreen from "../features/renter/NotificationsScreen";
 
 const Tab = createBottomTabNavigator();
@@ -24,7 +24,11 @@ export default function RenterTabs() {
         tabBarInactiveTintColor: colors.textSecondary,
 
         tabBarStyle: {
-          height: 75 + insets.bottom,
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 65 + insets.bottom,
           backgroundColor: "#FFFFFF",
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
@@ -45,18 +49,19 @@ export default function RenterTabs() {
             case "Home":
               iconName = "home-outline";
               break;
+
             case "Search":
               iconName = "search-outline";
               break;
+
             case "Map":
               iconName = "map-outline";
               break;
-            case "Saved":
-              iconName = "heart-outline";
-              break;
+
             case "Notifications":
               iconName = "notifications-outline";
               break;
+
             default:
               iconName = "ellipse-outline";
           }
@@ -68,7 +73,6 @@ export default function RenterTabs() {
       <Tab.Screen name="Home" component={RenterDashboardScreen} />
       <Tab.Screen name="Search" component={SearchScreen} />
       <Tab.Screen name="Map" component={MapScreen} />
-      <Tab.Screen name="Saved" component={SavedListingsScreen} />
       <Tab.Screen name="Notifications" component={NotificationsScreen} />
     </Tab.Navigator>
   );

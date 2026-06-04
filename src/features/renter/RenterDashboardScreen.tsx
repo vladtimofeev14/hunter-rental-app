@@ -5,15 +5,33 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  ActivityIndicator,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { auth, db } from "../../config/firebase";
-import { doc, getDoc } from "firebase/firestore";
-import { colors } from "../../styles/globalStyles";
+import {
+  auth,
+  db
+} from "../../config/firebase";
+import {
+  doc,
+  getDoc,
+  collection,
+  getDocs,
+  query,
+  where
+} from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
+import { colors } from "../../styles/globalStyles";
 
 export default function RenterDashboardScreen({ navigation }: any) {
   const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [savedCount, setSavedCount] = useState(0);
+  const [applicationsCount, setApplicationsCount] = useState(0);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
 
   const user = auth.currentUser;
 
@@ -24,85 +42,128 @@ export default function RenterDashboardScreen({ navigation }: any) {
     "User";
 
   useEffect(() => {
-    const loadProfile = async () => {
+    const loadData = async () => {
       if (!user) return;
 
-      const snap = await getDoc(doc(db, "renterPreferences", user.uid));
-      if (snap.exists()) setProfile(snap.data());
+      try {
+        setLoading(true);
+
+        const profileSnap = await getDoc(doc(db, "renterPreferences", user.uid));
+
+        let prefs: any = null;
+        if (profileSnap.exists()) {
+          prefs = profileSnap.data();
+          setProfile(prefs);
+        }
+
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+
+        const saved =
+          userSnap.exists() ? userSnap.data()?.favoritesID || [] : [];
+
+        setSavedCount(saved.length);
+
+        const appSnap = await getDocs(
+          query(collection(db, "applications"), where("userId", "==", user.uid))
+        );
+        setApplicationsCount(appSnap.size);
+
+        const bookingSnap = await getDocs(
+          query(collection(db, "bookings"), where("userId", "==", user.uid))
+        );
+        setBookings(bookingSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        const listingsSnap = await getDocs(collection(db, "listings"));
+
+        let listings = listingsSnap.docs.map(d => ({
+          id: d.id,
+          ...d.data()
+        }));
+
+        if (prefs?.budget) {
+          listings = listings.filter((l: any) => l.price?.amount <= prefs.budget);
+        }
+
+        if (prefs?.bedrooms) {
+          listings = listings.filter((l: any) => l.bedrooms === prefs.bedrooms);
+        }
+
+        if (prefs?.city) {
+          listings = listings.filter(
+            (l: any) =>
+              l.city?.toLowerCase() === prefs.city.toLowerCase()
+          );
+        }
+
+        setRecommendations(listings.slice(0, 5));
+
+      } catch (e) {
+        console.log("Dashboard error:", e);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    loadProfile();
+    loadData();
   }, []);
 
-  const mockData = {
-    recommendations: [
-      { id: "1", title: "Studio near GBC", price: 1400, distance: 1.2 },
-      { id: "2", title: "Shared apartment downtown", price: 950, distance: 3.5 },
-    ],
-    bookings: [
-      { id: "b1", title: "King St Viewing", date: "Tomorrow 3:00 PM" },
-    ],
-    applications: [
-      { id: "a1", title: "Queen St Loft", status: "Pending" },
-    ],
-  };
+  if (loading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={colors.primaryBlue} />
+      </View>
+    );
+  }
 
   const metrics = [
     {
       label: "Matches",
-      value: mockData.recommendations.length,
+      value: recommendations.length,
       icon: "search-outline",
       screen: "Search",
     },
     {
-      label: "Bookings",
-      value: mockData.bookings.length,
-      icon: "calendar-outline",
-      screen: "Map",
-    },
-    {
       label: "Applications",
-      value: mockData.applications.length,
+      value: applicationsCount,
       icon: "document-text-outline",
       screen: "ApplicationsScreen",
     },
     {
+      label: "Bookings",
+      value: bookings.length,
+      icon: "calendar-outline",
+      screen: "BookingsListScreen",
+    },
+    {
       label: "Saved",
-      value: 3,
+      value: savedCount,
       icon: "heart-outline",
-      screen: "Saved",
+      screen: "SavedListingsScreen",
     },
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+    <SafeAreaView edges={["top", "left", "right"]} style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+
         {/* HEADER */}
-        <View style={styles.headerRow}>
+        <View style={styles.header}>
           <View style={styles.avatar}>
             <Ionicons name="person" size={18} color="#fff" />
           </View>
 
-          <View style={styles.greetingContainer}>
+          <View style={{ flex: 1, marginLeft: 10 }}>
             <Text style={styles.greeting}>Hi, {displayName}</Text>
-            <Text style={styles.subGreeting}>
-              Your housing activity in one place
-            </Text>
+            <Text style={styles.sub}>Find your next home smarter</Text>
           </View>
 
-          <TouchableOpacity
-            onPress={() => navigation.navigate("UserProfile")}
-            style={styles.settingsBtn}
-          >
-            <Ionicons name="settings-outline" size={22} color="#111827" />
+          <TouchableOpacity onPress={() => navigation.navigate("UserProfile")}>
+            <Ionicons name="options-outline" size={22} color="#111827" />
           </TouchableOpacity>
         </View>
 
-        {/* METRICS GRID */}
-        <View style={styles.metricsGrid}>
+        {/* METRICS */}
+        <View style={styles.metrics}>
           {metrics.map((m, i) => (
             <TouchableOpacity
               key={i}
@@ -116,104 +177,94 @@ export default function RenterDashboardScreen({ navigation }: any) {
           ))}
         </View>
 
-        {/* RECOMMENDATIONS */}
+        {/* RECOMMENDED */}
         <Text style={styles.sectionTitle}>Recommended for you</Text>
 
-        {mockData.recommendations.map((item) => (
-          <View key={item.id} style={styles.card}>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardSub}>
-              ${item.price} · {item.distance} km
-            </Text>
+        {recommendations.length > 0 ? (
+          recommendations.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.propertyCard}
+              onPress={() =>
+                navigation.navigate("PropertyDetailsScreen", { listing: item })
+              }
+            >
+              {item.images?.[0] ? (
+                <Image source={{ uri: item.images[0] }} style={styles.image} />
+              ) : (
+                <View style={styles.imagePlaceholder} />
+              )}
+
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>{item.name || "Property"}</Text>
+                <Text style={styles.cardSub}>
+                  ${item.price?.amount ?? "—"} · {item.city ?? "Unknown"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.cardSub}>No matches found.</Text>
           </View>
-        ))}
+        )}
 
-        {/* BOOKINGS */}
-        <Text style={styles.sectionTitle}>Upcoming viewings</Text>
+        {/* UPCOMING */}
+        <Text style={styles.sectionTitle}>Upcoming viewing</Text>
 
-        {mockData.bookings.map((item) => (
-          <View key={item.id} style={styles.card}>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardSub}>{item.date}</Text>
+        {bookings.length > 0 ? (
+          <View style={styles.cardHighlight}>
+            <Text style={styles.cardTitle}>{bookings[0].title}</Text>
+            <Text style={styles.cardSub}>{bookings[0].date}</Text>
           </View>
-        ))}
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.cardSub}>No upcoming bookings</Text>
+          </View>
+        )}
 
-        {/* APPLICATIONS */}
-        <Text style={styles.sectionTitle}>Applications</Text>
-
-        {mockData.applications.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.card}
-            onPress={() => navigation.navigate("ApplicationsScreen")}
-          >
-            <Text style={styles.cardTitle}>{item.title}</Text>
-
-            <View style={styles.pendingRow}>
-              <Ionicons name="time-outline" size={14} color="#F59E0B" />
-              <Text style={styles.pending}>{item.status}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-
-        <View style={{ height: 120 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: "#F6F7FB" },
+
+  content: { paddingBottom: 20 },
+
+  loading: {
     flex: 1,
-    backgroundColor: "#F6F7FB",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  scrollContent: {
-    paddingBottom: 20,
-  },
-
-  headerRow: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 18,
-    paddingBottom: 10,
   },
 
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: colors.deepPurple,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  greetingContainer: {
-    flex: 1,
-    marginLeft: 10,
-  },
+  greeting: { fontSize: 18, fontWeight: "800", color: "#111827" },
 
-  greeting: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#111827",
-  },
+  sub: { fontSize: 12, color: "#6B7280" },
 
-  subGreeting: {
-    fontSize: 12,
-    color: "#6B7280",
-  },
-
-  settingsBtn: {
-    padding: 6,
-  },
-
-  metricsGrid: {
+  metrics: {
     flexDirection: "row",
     flexWrap: "wrap",
     paddingHorizontal: 20,
-    marginTop: 10,
+    marginTop: 15,
     gap: 10,
   },
 
@@ -221,31 +272,49 @@ const styles = StyleSheet.create({
     width: "48%",
     backgroundColor: "#fff",
     borderRadius: 16,
-    paddingVertical: 20,
+    paddingVertical: 18,
     alignItems: "center",
-    justifyContent: "center",
   },
 
-  metricValue: {
-    fontSize: 20,
-    fontWeight: "800",
-    marginTop: 6,
-  },
+  metricValue: { fontSize: 18, fontWeight: "800", marginTop: 6 },
 
-  metricLabel: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 2,
-  },
+  metricLabel: { fontSize: 12, color: "#6B7280" },
 
   sectionTitle: {
     marginTop: 18,
     marginBottom: 10,
     paddingHorizontal: 20,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
     color: "#111827",
   },
+
+  propertyCard: {
+    marginHorizontal: 20,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    marginBottom: 10,
+    overflow: "hidden",
+  },
+
+  image: {
+    width: "100%",
+    height: 120,
+  },
+
+  imagePlaceholder: {
+    width: "100%",
+    height: 120,
+    backgroundColor: "#E5E7EB",
+  },
+
+  cardContent: {
+    padding: 12,
+  },
+
+  cardTitle: { fontSize: 14, fontWeight: "700" },
+
+  cardSub: { fontSize: 12, color: "#6B7280", marginTop: 4 },
 
   card: {
     marginHorizontal: 20,
@@ -255,27 +324,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  cardSub: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 4,
-  },
-
-  pendingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 4,
-  },
-
-  pending: {
-    fontSize: 12,
-    color: "#F59E0B",
-    fontWeight: "600",
+  cardHighlight: {
+    marginHorizontal: 20,
+    backgroundColor: "#EEF2FF",
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 10,
   },
 });

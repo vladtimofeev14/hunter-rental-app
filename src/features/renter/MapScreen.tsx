@@ -1,73 +1,84 @@
-/*
-TODO 
-- Replace mock latitude/longitude with Firestore stored coordinates
-- Ensure landlord creates listing with geolocation
-- Optional: clustering for large datasets
-*/
-
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, Dimensions, Pressable } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, Text, StyleSheet, Dimensions } from "react-native";
+import MapView, { Marker, Region, Callout } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../config/firebase";
 
-export default function MapScreen({ route, navigation }: any) {
-  const listings = route?.params?.listings || [];
+export default function MapScreen({ navigation }: any) {
+  const [listings, setListings] = useState<any[]>([]);
 
-  // fallback region (Toronto default)
-  const defaultRegion = {
+  useEffect(() => {
+    const loadListings = async () => {
+      try {
+        const snap = await getDocs(collection(db, "listings"));
+
+        const data = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        setListings(data);
+      } catch (error) {
+        console.log("Map load error:", error);
+      }
+    };
+
+    loadListings();
+  }, []);
+
+  const validListings = useMemo(() => {
+    return listings.filter(
+      (l: any) =>
+        typeof l.lat === "number" &&
+        typeof l.lng === "number" &&
+        !isNaN(l.lat) &&
+        !isNaN(l.lng)
+    );
+  }, [listings]);
+
+  const defaultRegion: Region = {
     latitude: 43.6532,
     longitude: -79.3832,
     latitudeDelta: 0.08,
     longitudeDelta: 0.08,
   };
 
-  // center map based on first listing if available
-  const initialRegion = useMemo(() => {
-    if (listings.length > 0 && listings[0]?.latitude && listings[0]?.longitude) {
-      return {
-        latitude: listings[0].latitude,
-        longitude: listings[0].longitude,
+  const initialRegion =
+    validListings.length > 0
+      ? {
+        latitude: validListings[0].lat,
+        longitude: validListings[0].lng,
         latitudeDelta: 0.08,
         longitudeDelta: 0.08,
-      };
-    }
-    return defaultRegion;
-  }, [listings]);
+      }
+      : defaultRegion;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <MapView
-        style={styles.map}
-        provider={PROVIDER_GOOGLE}
-        initialRegion={initialRegion}
-      >
-        {/* LISTINGS MARKERS */}
-        {listings.map((item: any) => {
-          if (!item.latitude || !item.longitude) return null;
-
-          return (
-            <Marker
-              key={item.id}
-              coordinate={{
-                latitude: item.latitude,
-                longitude: item.longitude,
-              }}
-              title={item.name}
-              description={`${item.city} · $${item.price?.amount}`}
-              onPress={() =>
-                navigation.navigate("PropertyDetailsScreen", {
-                  listing: item,
-                })
-              }
-            />
-          );
-        })}
+    <SafeAreaView edges={["top", "left", "right"]} style={styles.container}>
+      <MapView style={styles.map} initialRegion={initialRegion}>
+        {validListings.map((item: any) => (
+          <Marker
+            key={item.id}
+            coordinate={{ latitude: item.lat, longitude: item.lng }}
+            onPress={() =>
+              navigation.navigate("PropertyDetailsScreen", { listing: item })
+            }
+          >
+            <Callout tooltip>
+              <View style={styles.priceMarker}>
+                <Text style={styles.priceText}>
+                  ${item.price?.amount}
+                </Text>
+              </View>
+            </Callout>
+          </Marker>
+        ))}
       </MapView>
 
-      {/* INFO PANEL (optional preview layer) */}
-      <View style={styles.bottomHint}>
-        <Text style={styles.hintText}>
-          Tap a marker to view details
+      <View style={styles.debug}>
+        <Text style={styles.text}>
+          Properties: {validListings.length}
         </Text>
       </View>
     </SafeAreaView>
@@ -84,17 +95,32 @@ const styles = StyleSheet.create({
     height: "100%",
   },
 
-  bottomHint: {
+  priceMarker: {
+    backgroundColor: "#0D74E7",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#fff",
+  },
+
+  priceText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+
+  debug: {
     position: "absolute",
     bottom: 20,
     alignSelf: "center",
     backgroundColor: "#111827",
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
   },
 
-  hintText: {
+  text: {
     color: "#fff",
     fontSize: 12,
   },
