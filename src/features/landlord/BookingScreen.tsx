@@ -7,7 +7,7 @@ export default function BookingScreen({ route, navigation }: any) {
   const listingId = route?.params?.listingId;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container}>          
       <View style={styles.card}>
         <Text style={styles.title}>Booking Screen</Text>
 

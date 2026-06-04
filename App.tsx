@@ -5,7 +5,7 @@ Dependecies
 npm install @react-navigation/native
 npm install @react-navigation/native-stack
 npx expo install react-native-screens react-native-safe-area-context
-npx expo install @expo/vector-icons
+npx expo install expo-symbols
 npx expo install @react-native-async-storage/async-storage
 npx expo install react-native-map-clustering
 npx expo install react-native-maps
