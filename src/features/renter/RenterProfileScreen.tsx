@@ -14,7 +14,7 @@ import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { deleteUser, signOut } from "firebase/auth";
 import { colors } from "../../styles/globalStyles";
 
-export default function UserProfileScreen({ navigation }: any) {
+export default function RenterProfileScreen({ navigation }: any) {
   const [prefs, setPrefs] = useState<any>(null);
   const user = auth.currentUser;
 

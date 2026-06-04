@@ -7,9 +7,10 @@ import LoginScreen from "../features/auth/LoginScreen";
 import SignupScreen from "../features/auth/SignupScreen";
 
 // RENTER
-import UserProfileScreen from "../features/renter/UserProfileScreen";
+import RenterProfileScreen from "../features/renter/RenterProfileScreen";
 import RenterPreferencesScreen from "../features/renter/RenterPreferencesScreen";
 import RenterTabs from "./RenterTabs";
+import LandlordTabs from "./LandlordTabs";
 import MapScreen from "../features/renter/MapScreen";
 import SavedListingsScreen from "../features/renter/SavedListingsScreen";
 import ApplicationsScreen from "../features/renter/ApplicationsScreen";
@@ -18,9 +19,10 @@ import BookingsListScreen from "../features/renter/BookingsListScreen";
 
 // LANDLORD
 import LandlordSetupScreen from "../features/landlord/LandlordSetupScreen";
-import LandlordDashboardScreen from "../features/landlord/LandlordDashboardScreen";
+import LandlordProfileScreen from "../features/landlord/LandlordProfileScreen";
+import AddListingScreen from "../features/landlord/AddListingScreen";
+import EditListingScreen from "../features/landlord/EditListingScreen";
 import PropertyDetailsScreen from "../features/landlord/PropertyDetailsScreen";
-import BookingScreen from "../features/landlord/BookingScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -32,7 +34,7 @@ export default function AppNavigator() {
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
-      <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+      <Stack.Screen name="RenterProfileScreen" component={RenterProfileScreen} />
 
       {/* RENTER FLOW */}
       <Stack.Screen name="RenterPreferencesScreen" component={RenterPreferencesScreen} />
@@ -44,10 +46,12 @@ export default function AppNavigator() {
 
       {/* LANDLORD & BOOKINGS */}
       <Stack.Screen name="LandlordSetupScreen" component={LandlordSetupScreen} />
-      <Stack.Screen name="LandlordDashboardScreen" component={LandlordDashboardScreen} />
+      <Stack.Screen name="LandlordTabs" component={LandlordTabs} />
+      <Stack.Screen name="LandlordProfileScreen" component={LandlordProfileScreen} />
+      <Stack.Screen name="AddListingScreen" component={AddListingScreen} />
+      <Stack.Screen name="EditListingScreen" component={EditListingScreen} />
       <Stack.Screen name="PropertyDetailsScreen" component={PropertyDetailsScreen} />
       <Stack.Screen name="BookingsListScreen" component={BookingsListScreen} />
-      <Stack.Screen name="BookingScreen" component={BookingScreen} />
 
     </Stack.Navigator>
   );

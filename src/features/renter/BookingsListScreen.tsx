@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth, db } from "../../config/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { colors } from "../../styles/globalStyles";
 
 export default function BookingsListScreen() {
@@ -17,29 +17,40 @@ export default function BookingsListScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
+    const user = auth.currentUser;
 
-      try {
-        const q = query(
-          collection(db, "bookings"),
-          where("userId", "==", user.uid)
-        );
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-        const snap = await getDocs(q);
+    const bookingsQuery = query(
+      collection(db, "bookings"),
+      where("renterID", "==", user.uid)
+    );
 
+    const unsubscribe = onSnapshot(
+      bookingsQuery,
+      (snap) => {
         setBookings(
-          snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+          snap.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .sort((a: any, b: any) => {
+              const aTime = a.createdAt?.seconds || 0;
+              const bTime = b.createdAt?.seconds || 0;
+              return bTime - aTime;
+            })
         );
-      } catch (e) {
+
+        setLoading(false);
+      },
+      (e) => {
         console.log("Bookings error:", e);
-      } finally {
         setLoading(false);
       }
-    };
+    );
 
-    load();
+    return unsubscribe;
   }, []);
 
   if (loading) {
@@ -65,14 +76,19 @@ export default function BookingsListScreen() {
           contentContainerStyle={{ paddingBottom: 120 }}
           renderItem={({ item }) => (
             <View style={styles.card}>
-              {item.image ? (
-                <Image source={{ uri: item.image }} style={styles.image} />
+              {item.listingImage ? (
+                <Image source={{ uri: item.listingImage }} style={styles.image} />
               ) : null}
 
-              <Text style={styles.name}>{item.title}</Text>
+              <View style={styles.cardHeader}>
+                <Text style={styles.name}>{item.listingTitle}</Text>
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusText}>{item.status}</Text>
+                </View>
+              </View>
 
               <Text style={styles.sub}>
-                {item.date} • {item.time}
+                Booking status updates appear here automatically.
               </Text>
             </View>
           )}
@@ -112,9 +128,30 @@ const styles = StyleSheet.create({
   },
 
   name: {
+    flex: 1,
     fontSize: 15,
     fontWeight: "700",
     color: colors.black,
+  },
+
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  statusBadge: {
+    backgroundColor: "#E5EBFB",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+
+  statusText: {
+    color: colors.primaryBlue,
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "capitalize",
   },
 
   sub: {

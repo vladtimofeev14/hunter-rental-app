@@ -1,15 +1,12 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { SymbolView, type SFSymbol } from "expo-symbols";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../styles/globalStyles";
 import LandlordDashboardScreen from "../features/landlord/LandlordDashboardScreen";
+import BookingScreen from "../features/landlord/BookingScreen";
 
 const Tab = createBottomTabNavigator();
-
-const tabIcons: Record<string, { active: SFSymbol; inactive: SFSymbol }> = {
-  Home: { active: "house.fill", inactive: "house" },
-};
 
 export default function LandlordTabs() {
   const insets = useSafeAreaInsets();
@@ -18,11 +15,17 @@ export default function LandlordTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarShowLabel: true,
+        tabBarShowLabel: false,
+
         tabBarActiveTintColor: colors.primaryBlue,
         tabBarInactiveTintColor: colors.textSecondary,
+
         tabBarStyle: {
-          height: 75 + insets.bottom,
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 65 + insets.bottom,
           backgroundColor: "#FFFFFF",
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
@@ -35,27 +38,29 @@ export default function LandlordTabs() {
           shadowOffset: { width: 0, height: -3 },
           elevation: 10,
         },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "600",
-        },
-        tabBarIcon: ({ color, focused }) => {
-          const iconName = focused
-            ? tabIcons[route.name]?.active
-            : tabIcons[route.name]?.inactive;
 
-          return (
-            <SymbolView
-              name={iconName || "circle"}
-              size={22}
-              tintColor={color}
-              resizeMode="scaleAspectFit"
-            />
-          );
+        tabBarIcon: ({ color }) => {
+          let iconName: any;
+
+          switch (route.name) {
+            case "Home":
+              iconName = "home-outline";
+              break;
+
+            case "BookingScreen":
+              iconName = "calendar-outline";
+              break;
+
+            default:
+              iconName = "ellipse-outline";
+          }
+
+          return <Ionicons name={iconName} size={21} color={color} />;
         },
       })}
     >
       <Tab.Screen name="Home" component={LandlordDashboardScreen} />
+      <Tab.Screen name="BookingScreen" component={BookingScreen} />
     </Tab.Navigator>
   );
 }

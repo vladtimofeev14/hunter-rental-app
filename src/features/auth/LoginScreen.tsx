@@ -107,7 +107,7 @@ export default function LoginScreen({ navigation }: any) {
             } else if (role === "landlord") {
                 navigation.reset({
                     index: 0,
-                    routes: [{ name: "LandlordSetupScreen" }], 
+                    routes: [{ name: "LandlordSetupScreen" }],
                 });
             } else {
                 setError("User role not found.");

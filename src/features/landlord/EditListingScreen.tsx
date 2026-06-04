@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -9,38 +10,58 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { addDoc, collection } from "firebase/firestore";
+import { deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { auth, db } from "../../config/firebase";
+import { db } from "../../config/firebase";
 import { colors } from "../../styles/globalStyles";
 
 const propertyTypes = ["Condo", "House", "Room"];
 const pricePeriods = ["per day", "per month"];
 const leaseLengths = ["Daily", "4 Month", "8 Months", "12 Months"];
+const listingStatuses = ["Active", "Rented", "Inactive"];
 
 type Coordinates = {
   lat: number;
   lng: number;
 };
 
-export default function AddListingScreen({ navigation }: any) {
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [description, setDescription] = useState("");
-  const [sizeSqft, setSizeSqft] = useState("");
-  const [bedrooms, setBedrooms] = useState("");
-  const [bathrooms, setBathrooms] = useState("");
-  const [floor, setFloor] = useState("");
-  const [propertyType, setPropertyType] = useState("");
-  const [priceAmount, setPriceAmount] = useState("");
-  const [pricePeriod, setPricePeriod] = useState("");
-  const [leaseLength, setLeaseLength] = useState("");
-  const [image1, setImage1] = useState("");
-  const [image2, setImage2] = useState("");
-  const [image3, setImage3] = useState("");
+export default function EditListingScreen({ route, navigation }: any) {
+  const listing = route?.params?.listing;
+
+  const initialImages = useMemo(
+    () => (Array.isArray(listing?.images) ? listing.images : []),
+    [listing?.images]
+  );
+
+  const [name, setName] = useState(listing?.name || "");
+  const [address, setAddress] = useState(listing?.address || "");
+  const [city, setCity] = useState(listing?.city || "");
+  const [description, setDescription] = useState(listing?.description || "");
+  const [sizeSqft, setSizeSqft] = useState(
+    listing?.sizeSqft !== undefined ? String(listing.sizeSqft) : ""
+  );
+  const [bedrooms, setBedrooms] = useState(
+    listing?.bedrooms !== undefined ? String(listing.bedrooms) : ""
+  );
+  const [bathrooms, setBathrooms] = useState(
+    listing?.bathrooms !== undefined ? String(listing.bathrooms) : ""
+  );
+  const [floor, setFloor] = useState(
+    listing?.floor !== undefined ? String(listing.floor) : ""
+  );
+  const [propertyType, setPropertyType] = useState(listing?.propertyType || "");
+  const [priceAmount, setPriceAmount] = useState(
+    listing?.price?.amount !== undefined ? String(listing.price.amount) : ""
+  );
+  const [pricePeriod, setPricePeriod] = useState(listing?.price?.period || "");
+  const [leaseLength, setLeaseLength] = useState(listing?.leaseLength || "");
+  const [status, setStatus] = useState(listing?.status || "Active");
+  const [image1, setImage1] = useState(initialImages[0] || "");
+  const [image2, setImage2] = useState(initialImages[1] || "");
+  const [image3, setImage3] = useState(initialImages[2] || "");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const OptionGroup = ({
     options,
@@ -92,26 +113,12 @@ export default function AddListingScreen({ navigation }: any) {
     return { lat, lng };
   };
 
-  const resetForm = () => {
-    setName("");
-    setAddress("");
-    setCity("");
-    setDescription("");
-    setSizeSqft("");
-    setBedrooms("");
-    setBathrooms("");
-    setFloor("");
-    setPropertyType("");
-    setPriceAmount("");
-    setPricePeriod("");
-    setLeaseLength("");
-    setImage1("");
-    setImage2("");
-    setImage3("");
-  };
+  const handleSaveChanges = async () => {
+    if (!listing?.id) {
+      setError("Listing not found.");
+      return;
+    }
 
-  const handleCreateListing = async () => {
-    const user = auth.currentUser;
     const cleanName = name.trim();
     const cleanAddress = address.trim();
     const cleanCity = city.trim();
@@ -126,11 +133,6 @@ export default function AddListingScreen({ navigation }: any) {
     const numericFloor = Number(floor);
     const numericPrice = Number(priceAmount);
 
-    if (!user) {
-      setError("Landlord user not found.");
-      return;
-    }
-
     if (
       !cleanName ||
       !cleanAddress ||
@@ -144,6 +146,7 @@ export default function AddListingScreen({ navigation }: any) {
       !priceAmount ||
       !pricePeriod ||
       !leaseLength ||
+      !status ||
       !cleanImage1 ||
       !cleanImage2 ||
       !cleanImage3
@@ -164,19 +167,23 @@ export default function AddListingScreen({ navigation }: any) {
     }
 
     try {
-      setLoading(true);
+      setSaving(true);
       setError(null);
 
-      const coordinates = await geocodeAddress();
+      const addressChanged =
+        cleanAddress !== listing.address || cleanCity !== listing.city;
+      let coordinates: Coordinates | null = null;
 
-      if (!coordinates) {
-        setError("Could not calculate coordinates for this address.");
-        return;
+      if (addressChanged) {
+        coordinates = await geocodeAddress();
+
+        if (!coordinates) {
+          setError("Could not calculate coordinates for this address.");
+          return;
+        }
       }
 
-      await addDoc(collection(db, "listings"), {
-        landlordID: user.uid,
-        renterID: "",
+      await updateDoc(doc(db, "listings", listing.id), {
         name: cleanName,
         address: cleanAddress,
         city: cleanCity,
@@ -192,19 +199,61 @@ export default function AddListingScreen({ navigation }: any) {
         },
         leaseLength,
         images: [cleanImage1, cleanImage2, cleanImage3],
-        lat: coordinates.lat,
-        lng: coordinates.lng,
-        status: "Active",
+        status,
+        ...(coordinates
+          ? {
+              lat: coordinates.lat,
+              lng: coordinates.lng,
+            }
+          : {}),
       });
 
-      resetForm();
-      navigation.navigate("LandlordTabs", { screen: "Home" });
+      navigation.goBack();
     } catch (e: any) {
-      setError(e?.message || "Failed to create listing.");
+      setError(e?.message || "Failed to save changes.");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
+
+  const confirmDeleteListing = () => {
+    Alert.alert(
+      "Delete listing",
+      "Are you sure you want to delete this listing?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: handleDeleteListing,
+        },
+      ]
+    );
+  };
+
+  const handleDeleteListing = async () => {
+    if (!listing?.id) return;
+
+    try {
+      setDeleting(true);
+      await deleteDoc(doc(db, "listings", listing.id));
+      navigation.goBack();
+    } catch (e: any) {
+      setError(e?.message || "Failed to delete listing.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (!listing) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContent}>
+          <Text style={styles.error}>Listing not found.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -216,7 +265,7 @@ export default function AddListingScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
-          <Text style={styles.title}>Add Listing</Text>
+          <Text style={styles.title}>Edit Listing</Text>
 
           <TextInput
             style={styles.input}
@@ -317,6 +366,13 @@ export default function AddListingScreen({ navigation }: any) {
             onChange={setLeaseLength}
           />
 
+          <Text style={styles.label}>Status</Text>
+          <OptionGroup
+            options={listingStatuses}
+            value={status}
+            onChange={setStatus}
+          />
+
           <TextInput
             style={styles.input}
             placeholder="Image 1"
@@ -345,17 +401,29 @@ export default function AddListingScreen({ navigation }: any) {
           />
 
           {error && <Text style={styles.error}>{error}</Text>}
+        </ScrollView>
 
+        <View style={styles.footer}>
           <TouchableOpacity
-            style={styles.button}
-            onPress={handleCreateListing}
-            disabled={loading}
+            style={[styles.saveButton, saving && styles.disabledButton]}
+            onPress={handleSaveChanges}
+            disabled={saving || deleting}
           >
-            <Text style={styles.buttonText}>
-              {loading ? "Creating..." : "Create Listing"}
+            <Text style={styles.saveButtonText}>
+              {saving ? "Saving..." : "Save changes"}
             </Text>
           </TouchableOpacity>
-        </ScrollView>
+
+          <TouchableOpacity
+            style={[styles.deleteButton, deleting && styles.disabledButton]}
+            onPress={confirmDeleteListing}
+            disabled={saving || deleting}
+          >
+            <Text style={styles.deleteButtonText}>
+              {deleting ? "Deleting..." : "Delete listing"}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -373,7 +441,14 @@ const styles = StyleSheet.create({
 
   content: {
     padding: 16,
-    paddingBottom: 130,
+    paddingBottom: 160,
+  },
+
+  centerContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
   },
 
   title: {
@@ -446,17 +521,42 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  button: {
+  footer: {
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+    padding: 16,
+    gap: 10,
+  },
+
+  saveButton: {
     backgroundColor: colors.deepPurple,
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: "center",
-    marginTop: 4,
   },
 
-  buttonText: {
+  saveButtonText: {
     color: "#FFFFFF",
     fontWeight: "800",
     fontSize: 16,
+  },
+
+  deleteButton: {
+    borderWidth: 1,
+    borderColor: "#DC2626",
+    paddingVertical: 15,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+
+  deleteButtonText: {
+    color: "#DC2626",
+    fontWeight: "800",
+    fontSize: 16,
+  },
+
+  disabledButton: {
+    opacity: 0.7,
   },
 });

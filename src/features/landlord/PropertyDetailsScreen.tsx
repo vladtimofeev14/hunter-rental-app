@@ -11,7 +11,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { arrayRemove, arrayUnion, doc, getDoc, updateDoc } from "firebase/firestore";
+import {
+  addDoc,
+  arrayRemove,
+  arrayUnion,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 import { colors } from "../../styles/globalStyles";
 
@@ -23,6 +32,7 @@ export default function PropertyDetailsScreen({ route, navigation }: any) {
   const [owner, setOwner] = useState<any>(null);
   const [ownerLoading, setOwnerLoading] = useState(false);
   const [favorite, setFavorite] = useState(false);
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   const images = useMemo(
     () =>
@@ -146,6 +156,66 @@ export default function PropertyDetailsScreen({ route, navigation }: any) {
     setFavorite(true);
   };
 
+  const handleBookViewing = async () => {
+    const user = auth.currentUser;
+
+    if (!user || !listing.id) return;
+
+    try {
+      setBookingLoading(true);
+
+      let bookingListing = listing;
+
+      let bookingLandlordID =
+        bookingListing.landlordID ||
+        bookingListing.landlordId ||
+        bookingListing.ownerID ||
+        bookingListing.ownerId ||
+        bookingListing.userID ||
+        bookingListing.userId;
+
+      if (!bookingLandlordID) {
+        const listingSnap = await getDoc(doc(db, "listings", listing.id));
+
+        if (listingSnap.exists()) {
+          bookingListing = {
+            id: listingSnap.id,
+            ...listingSnap.data(),
+          };
+
+          bookingLandlordID =
+            bookingListing.landlordID ||
+            bookingListing.landlordId ||
+            bookingListing.ownerID ||
+            bookingListing.ownerId ||
+            bookingListing.userID ||
+            bookingListing.userId;
+        }
+      }
+
+      if (!bookingLandlordID) {
+        Alert.alert("Booking unavailable", "Listing owner was not found.");
+        return;
+      }
+
+      await addDoc(collection(db, "bookings"), {
+        landlordID: bookingLandlordID,
+        renterID: user.uid,
+        listingD: listing.id,
+        listingTitle: bookingListing.name || "Property",
+        listingImage: bookingListing.images?.[0] || "",
+        status: "pending",
+        createdAt: serverTimestamp(),
+      });
+
+      navigation.navigate("BookingsListScreen");
+    } catch (e: any) {
+      Alert.alert("Booking failed", e?.message || "Could not create booking.");
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -252,14 +322,13 @@ export default function PropertyDetailsScreen({ route, navigation }: any) {
 
       <View style={styles.footer}>
         <Pressable
-          style={styles.button}
-          onPress={() =>
-            navigation.navigate("BookingScreen", {
-              listingId: listing.id,
-            })
-          }
+          style={[styles.button, bookingLoading && styles.buttonDisabled]}
+          onPress={handleBookViewing}
+          disabled={bookingLoading}
         >
-          <Text style={styles.buttonText}>Book Viewing</Text>
+          <Text style={styles.buttonText}>
+            {bookingLoading ? "Booking..." : "Book Viewing"}
+          </Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -473,6 +542,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: "center",
+  },
+
+  buttonDisabled: {
+    opacity: 0.7,
   },
 
   buttonText: {

@@ -26,6 +26,7 @@ import { colors } from "../../styles/globalStyles";
 
 export default function RenterDashboardScreen({ navigation }: any) {
   const [profile, setProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const [savedCount, setSavedCount] = useState(0);
@@ -36,7 +37,8 @@ export default function RenterDashboardScreen({ navigation }: any) {
   const user = auth.currentUser;
 
   const displayName =
-    profile?.name ||
+    userProfile?.firstName ||
+    userProfile?.name ||
     user?.displayName ||
     user?.email?.split("@")[0] ||
     "User";
@@ -57,9 +59,12 @@ export default function RenterDashboardScreen({ navigation }: any) {
         }
 
         const userSnap = await getDoc(doc(db, "users", user.uid));
+        const userData = userSnap.exists() ? userSnap.data() : null;
+
+        setUserProfile(userData);
 
         const saved =
-          userSnap.exists() ? userSnap.data()?.favoritesID || [] : [];
+          userData?.favoritesID || [];
 
         setSavedCount(saved.length);
 
@@ -69,7 +74,7 @@ export default function RenterDashboardScreen({ navigation }: any) {
         setApplicationsCount(appSnap.size);
 
         const bookingSnap = await getDocs(
-          query(collection(db, "bookings"), where("userId", "==", user.uid))
+          query(collection(db, "bookings"), where("renterID", "==", user.uid))
         );
         setBookings(bookingSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
@@ -157,7 +162,7 @@ export default function RenterDashboardScreen({ navigation }: any) {
             <Text style={styles.sub}>Find your next home smarter</Text>
           </View>
 
-          <TouchableOpacity onPress={() => navigation.navigate("UserProfile")}>
+          <TouchableOpacity onPress={() => navigation.navigate("RenterProfileScreen")}>
             <Ionicons name="options-outline" size={22} color="#111827" />
           </TouchableOpacity>
         </View>
@@ -214,8 +219,8 @@ export default function RenterDashboardScreen({ navigation }: any) {
 
         {bookings.length > 0 ? (
           <View style={styles.cardHighlight}>
-            <Text style={styles.cardTitle}>{bookings[0].title}</Text>
-            <Text style={styles.cardSub}>{bookings[0].date}</Text>
+            <Text style={styles.cardTitle}>{bookings[0].listingTitle}</Text>
+            <Text style={styles.cardSub}>Status: {bookings[0].status}</Text>
           </View>
         ) : (
           <View style={styles.card}>

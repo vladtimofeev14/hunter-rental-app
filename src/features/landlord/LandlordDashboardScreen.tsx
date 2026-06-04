@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../config/firebase";
@@ -15,8 +15,17 @@ import { colors } from "../../styles/globalStyles";
 
 export default function LandlordDashboardScreen({ navigation }: any) {
   const [listings, setListings] = useState<any[]>([]);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const user = auth.currentUser;
+
+  const displayName =
+    userProfile?.firstName ||
+    userProfile?.name ||
+    user?.displayName ||
+    user?.email?.split("@")[0] ||
+    "User";
 
   useFocusEffect(
     useCallback(() => {
@@ -33,6 +42,9 @@ export default function LandlordDashboardScreen({ navigation }: any) {
         try {
           setLoading(true);
           setError(null);
+
+          const userSnap = await getDoc(doc(db, "users", user.uid));
+          setUserProfile(userSnap.exists() ? userSnap.data() : null);
 
           const listingsQuery = query(
             collection(db, "listings"),
@@ -53,7 +65,14 @@ export default function LandlordDashboardScreen({ navigation }: any) {
   );
 
   const renderListing = ({ item }: any) => (
-    <View style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() =>
+        navigation.navigate("EditListingScreen", {
+          listing: item,
+        })
+      }
+    >
       <View style={styles.cardHeader}>
         <View style={styles.cardTitleBlock}>
           <Text style={styles.cardTitle} numberOfLines={1}>
@@ -76,22 +95,26 @@ export default function LandlordDashboardScreen({ navigation }: any) {
       <Text style={styles.price}>
         ${item.price?.amount}/{item.price?.period}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        <View style={styles.avatar}>
+          <Ionicons name="person" size={18} color="#fff" />
+        </View>
+
         <View style={styles.headerText}>
-          <Text style={styles.title}>Landlord Home</Text>
-          <Text style={styles.subtitle}>Your listings</Text>
+          <Text style={styles.greeting}>Hi, {displayName}</Text>
+          <Text style={styles.subtitle}>Manage your rental listings</Text>
         </View>
 
         <TouchableOpacity
           onPress={() => navigation.navigate("LandlordProfileScreen")}
           style={styles.settingsBtn}
         >
-          <Ionicons name="settings-outline" size={22} color="#111827" />
+          <Ionicons name="options-outline" size={22} color="#111827" />
         </TouchableOpacity>
       </View>
 
@@ -136,21 +159,31 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: 20,
+    paddingTop: 18,
     paddingBottom: 10,
+  },
+
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.deepPurple,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   headerText: {
     flex: 1,
+    marginLeft: 10,
   },
 
   settingsBtn: {
     padding: 6,
   },
 
-  title: {
-    fontSize: 28,
+  greeting: {
+    fontSize: 18,
     fontWeight: "800",
     color: "#111827",
   },
