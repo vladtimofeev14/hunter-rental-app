@@ -1,13 +1,22 @@
 import React, { useCallback, useState } from "react";
 import {
   FlatList,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  documentId,
+  getDoc,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../config/firebase";
@@ -16,6 +25,7 @@ import { colors } from "../../styles/globalStyles";
 export default function LandlordDashboardScreen({ navigation }: any) {
   const [listings, setListings] = useState<any[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [bookingsCount, setBookingsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const user = auth.currentUser;
@@ -44,15 +54,49 @@ export default function LandlordDashboardScreen({ navigation }: any) {
           setError(null);
 
           const userSnap = await getDoc(doc(db, "users", user.uid));
-          setUserProfile(userSnap.exists() ? userSnap.data() : null);
+          const userData = userSnap.exists() ? userSnap.data() : null;
+          setUserProfile(userData);
 
-          const listingsQuery = query(
-            collection(db, "listings"),
-            where("landlordID", "==", user.uid)
+          const listingIDs = Array.isArray(userData?.listingIDs)
+            ? userData.listingIDs.filter((id: any) => typeof id === "string" && id.trim())
+            : [];
+
+          if (listingIDs.length === 0) {
+            setListings([]);
+          } else {
+            const chunks: string[][] = [];
+
+            for (let i = 0; i < listingIDs.length; i += 10) {
+              chunks.push(listingIDs.slice(i, i + 10));
+            }
+
+            const results: any[] = [];
+
+            for (const chunk of chunks) {
+              const listingsQuery = query(
+                collection(db, "listings"),
+                where(documentId(), "in", chunk)
+              );
+
+              const snap = await getDocs(listingsQuery);
+              snap.forEach((d) => {
+                results.push({ id: d.id, ...d.data() });
+              });
+            }
+
+            const listingsByID = new Map(results.map((item) => [item.id, item]));
+            setListings(
+              listingIDs
+                .map((id: string) => listingsByID.get(id))
+                .filter(Boolean)
+            );
+          }
+
+          const bookingsSnap = await getDocs(
+            query(collection(db, "bookings"), where("landlordID", "==", user.uid))
           );
-          const snap = await getDocs(listingsQuery);
 
-          setListings(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+          setBookingsCount(bookingsSnap.size);
         } catch (e: any) {
           setError(e?.message || "Failed to load listings.");
         } finally {
@@ -63,6 +107,37 @@ export default function LandlordDashboardScreen({ navigation }: any) {
       loadListings();
     }, [])
   );
+
+  const activeListingsCount = listings.filter(
+    (listing) => listing.status === "Active"
+  ).length;
+
+  const metrics = [
+    {
+      label: "Listings",
+      value: listings.length,
+      icon: "home-outline",
+      screen: null,
+    },
+    {
+      label: "Active",
+      value: activeListingsCount,
+      icon: "checkmark-circle-outline",
+      screen: null,
+    },
+    {
+      label: "Bookings",
+      value: bookingsCount,
+      icon: "calendar-outline",
+      screen: "Bookings",
+    },
+    {
+      label: "Add",
+      value: "+",
+      icon: "add-circle-outline",
+      screen: "AddListingScreen",
+    },
+  ];
 
   const renderListing = ({ item }: any) => (
     <TouchableOpacity
@@ -101,9 +176,13 @@ export default function LandlordDashboardScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={18} color="#fff" />
-        </View>
+        {userProfile?.avatarUrl ? (
+          <Image source={{ uri: userProfile.avatarUrl }} style={styles.avatarImage} />
+        ) : (
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={18} color="#fff" />
+          </View>
+        )}
 
         <View style={styles.headerText}>
           <Text style={styles.greeting}>Hi, {displayName}</Text>
@@ -116,6 +195,25 @@ export default function LandlordDashboardScreen({ navigation }: any) {
         >
           <Ionicons name="options-outline" size={22} color="#111827" />
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.metrics}>
+        {metrics.map((metric) => (
+          <TouchableOpacity
+            key={metric.label}
+            style={styles.metricCard}
+            onPress={() => {
+              if (metric.screen) {
+                navigation.navigate(metric.screen);
+              }
+            }}
+            disabled={!metric.screen}
+          >
+            <Ionicons name={metric.icon as any} size={22} color={colors.primaryBlue} />
+            <Text style={styles.metricValue}>{metric.value}</Text>
+            <Text style={styles.metricLabel}>{metric.label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {loading ? (
@@ -173,6 +271,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  avatarImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+
   headerText: {
     flex: 1,
     marginLeft: 10,
@@ -199,6 +303,36 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
+  },
+
+  metrics: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 20,
+    marginTop: 5,
+    marginBottom: 10,
+    gap: 10,
+  },
+
+  metricCard: {
+    width: "48%",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+
+  metricValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#111827",
+    marginTop: 6,
+  },
+
+  metricLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 2,
   },
 
   listContent: {

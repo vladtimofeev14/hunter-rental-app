@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { auth, db } from "../../config/firebase";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { colors } from "../../styles/globalStyles";
+import { formatDateTime, toDate } from "../chat/chatHelpers";
 
 export default function BookingsListScreen() {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -36,9 +37,15 @@ export default function BookingsListScreen() {
           snap.docs
             .map((d) => ({ id: d.id, ...d.data() }))
             .sort((a: any, b: any) => {
-              const aTime = a.createdAt?.seconds || 0;
-              const bTime = b.createdAt?.seconds || 0;
-              return bTime - aTime;
+              const aTime =
+                toDate(a.scheduledAt)?.getTime() ||
+                toDate(a.createdAt)?.getTime() ||
+                0;
+              const bTime =
+                toDate(b.scheduledAt)?.getTime() ||
+                toDate(b.createdAt)?.getTime() ||
+                0;
+              return aTime - bTime;
             })
         );
 
@@ -81,14 +88,22 @@ export default function BookingsListScreen() {
               ) : null}
 
               <View style={styles.cardHeader}>
-                <Text style={styles.name}>{item.listingTitle}</Text>
+                <Text style={styles.name}>
+                  {item.listingTitle || item.listingName || "Property"}
+                </Text>
                 <View style={styles.statusBadge}>
                   <Text style={styles.statusText}>{item.status}</Text>
                 </View>
               </View>
 
+              <Text style={styles.meta}>
+                {item.listingAddress || "Address unavailable"}
+              </Text>
+              <Text style={styles.meta}>
+                Landlord: {item.landlordName || "Landlord"}
+              </Text>
               <Text style={styles.sub}>
-                Booking status updates appear here automatically.
+                Viewing date: {formatDateTime(item.scheduledAt)}
               </Text>
             </View>
           )}
@@ -158,6 +173,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 4,
+  },
+
+  meta: {
+    fontSize: 13,
+    color: "#4B5563",
+    marginTop: 6,
   },
 
   empty: {

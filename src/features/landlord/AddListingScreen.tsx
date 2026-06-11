@@ -9,14 +9,23 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { addDoc, collection } from "firebase/firestore";
+import { arrayUnion, collection, doc, writeBatch } from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth, db } from "../../config/firebase";
 import { colors } from "../../styles/globalStyles";
 
 const propertyTypes = ["Condo", "House", "Room"];
+const housingTypes = ["Shared", "Private"];
 const pricePeriods = ["per day", "per month"];
 const leaseLengths = ["Daily", "4 Month", "8 Months", "12 Months"];
+const lifestylePreferences = [
+  "Quiet",
+  "Social",
+  "Studious",
+  "Night Owl",
+  "Clean",
+  "Budget-focused",
+];
 
 type Coordinates = {
   lat: number;
@@ -33,6 +42,9 @@ export default function AddListingScreen({ navigation }: any) {
   const [bathrooms, setBathrooms] = useState("");
   const [floor, setFloor] = useState("");
   const [propertyType, setPropertyType] = useState("");
+  const [housingType, setHousingType] = useState("");
+  const [selectedLifestylePreferences, setSelectedLifestylePreferences] =
+    useState<string[]>([]);
   const [priceAmount, setPriceAmount] = useState("");
   const [pricePeriod, setPricePeriod] = useState("");
   const [leaseLength, setLeaseLength] = useState("");
@@ -74,6 +86,14 @@ export default function AddListingScreen({ navigation }: any) {
     </View>
   );
 
+  const toggleLifestylePreference = (item: string) => {
+    setSelectedLifestylePreferences((current) =>
+      current.includes(item)
+        ? current.filter((preference) => preference !== item)
+        : [...current, item]
+    );
+  };
+
   const geocodeAddress = async (): Promise<Coordinates | null> => {
     const query = encodeURIComponent(`${address.trim()}, ${city.trim()}`);
     const response = await fetch(
@@ -102,6 +122,8 @@ export default function AddListingScreen({ navigation }: any) {
     setBathrooms("");
     setFloor("");
     setPropertyType("");
+    setHousingType("");
+    setSelectedLifestylePreferences([]);
     setPriceAmount("");
     setPricePeriod("");
     setLeaseLength("");
@@ -141,6 +163,7 @@ export default function AddListingScreen({ navigation }: any) {
       !bathrooms ||
       !floor ||
       !propertyType ||
+      !housingType ||
       !priceAmount ||
       !pricePeriod ||
       !leaseLength ||
@@ -174,7 +197,11 @@ export default function AddListingScreen({ navigation }: any) {
         return;
       }
 
-      await addDoc(collection(db, "listings"), {
+      const listingRef = doc(collection(db, "listings"));
+      const userRef = doc(db, "users", user.uid);
+      const batch = writeBatch(db);
+
+      batch.set(listingRef, {
         landlordID: user.uid,
         renterID: "",
         name: cleanName,
@@ -186,6 +213,8 @@ export default function AddListingScreen({ navigation }: any) {
         bathrooms: numericBathrooms,
         floor: numericFloor,
         propertyType,
+        housingType,
+        lifestylePreferences: selectedLifestylePreferences,
         price: {
           amount: numericPrice,
           period: pricePeriod,
@@ -195,7 +224,18 @@ export default function AddListingScreen({ navigation }: any) {
         lat: coordinates.lat,
         lng: coordinates.lng,
         status: "Active",
+        updatedAt: new Date().toISOString(),
       });
+
+      batch.set(
+        userRef,
+        {
+          listingIDs: arrayUnion(listingRef.id),
+        },
+        { merge: true }
+      );
+
+      await batch.commit();
 
       resetForm();
       navigation.navigate("LandlordTabs", { screen: "Home" });
@@ -293,6 +333,38 @@ export default function AddListingScreen({ navigation }: any) {
             value={propertyType}
             onChange={setPropertyType}
           />
+
+          <Text style={styles.label}>Housing Type</Text>
+          <OptionGroup
+            options={housingTypes}
+            value={housingType}
+            onChange={setHousingType}
+          />
+
+          <Text style={styles.label}>Lifestyle</Text>
+          <View style={styles.optionGroup}>
+            {lifestylePreferences.map((preference) => (
+              <TouchableOpacity
+                key={preference}
+                style={[
+                  styles.optionButton,
+                  selectedLifestylePreferences.includes(preference) &&
+                    styles.optionButtonActive,
+                ]}
+                onPress={() => toggleLifestylePreference(preference)}
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    selectedLifestylePreferences.includes(preference) &&
+                      styles.optionTextActive,
+                  ]}
+                >
+                  {preference}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <TextInput
             style={styles.input}

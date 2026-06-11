@@ -10,9 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { arrayRemove, doc, updateDoc, writeBatch } from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { db } from "../../config/firebase";
+import { auth, db } from "../../config/firebase";
 import { colors } from "../../styles/globalStyles";
 
 const propertyTypes = ["Condo", "House", "Room"];
@@ -236,7 +236,23 @@ export default function EditListingScreen({ route, navigation }: any) {
 
     try {
       setDeleting(true);
-      await deleteDoc(doc(db, "listings", listing.id));
+      const user = auth.currentUser;
+      const listingOwnerID = listing.landlordID || user?.uid;
+      const batch = writeBatch(db);
+
+      batch.delete(doc(db, "listings", listing.id));
+
+      if (listingOwnerID) {
+        batch.set(
+          doc(db, "users", listingOwnerID),
+          {
+            listingIDs: arrayRemove(listing.id),
+          },
+          { merge: true }
+        );
+      }
+
+      await batch.commit();
       navigation.goBack();
     } catch (e: any) {
       setError(e?.message || "Failed to delete listing.");

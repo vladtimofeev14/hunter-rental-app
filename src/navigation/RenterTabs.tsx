@@ -8,6 +8,7 @@ import RenterDashboardScreen from "../features/renter/RenterDashboardScreen";
 import SearchScreen from "../features/renter/SearchScreen";
 import MapScreen from "../features/renter/MapScreen";
 import NotificationsScreen from "../features/renter/NotificationsScreen";
+import ConversationsListScreen from "../features/chat/ConversationsListScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -58,6 +59,10 @@ export default function RenterTabs() {
               iconName = "map-outline";
               break;
 
+            case "Chats":
+              iconName = "chatbubbles-outline";
+              break;
+
             case "Notifications":
               iconName = "notifications-outline";
               break;
@@ -73,6 +78,7 @@ export default function RenterTabs() {
       <Tab.Screen name="Home" component={RenterDashboardScreen} />
       <Tab.Screen name="Search" component={SearchScreen} />
       <Tab.Screen name="Map" component={MapScreen} />
+      <Tab.Screen name="Chats" component={ConversationsListScreen} />
       <Tab.Screen name="Notifications" component={NotificationsScreen} />
     </Tab.Navigator>
   );

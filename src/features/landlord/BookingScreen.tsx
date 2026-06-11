@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 import { colors } from "../../styles/globalStyles";
+import { formatDateTime, toDate } from "../chat/chatHelpers";
 
 const bookingStatuses = ["pending", "accepted", "rejected", "completed"];
 
@@ -40,9 +41,15 @@ export default function BookingScreen() {
         const nextBookings = snap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
           .sort((a: any, b: any) => {
-            const aTime = a.createdAt?.seconds || 0;
-            const bTime = b.createdAt?.seconds || 0;
-            return bTime - aTime;
+            const aTime =
+              toDate(a.scheduledAt)?.getTime() ||
+              toDate(a.createdAt)?.getTime() ||
+              0;
+            const bTime =
+              toDate(b.scheduledAt)?.getTime() ||
+              toDate(b.createdAt)?.getTime() ||
+              0;
+            return aTime - bTime;
           });
 
         setBookings(nextBookings);
@@ -104,9 +111,18 @@ export default function BookingScreen() {
             />
           ) : null}
 
-          <Text style={styles.detailTitle}>{selectedBooking.listingTitle}</Text>
-          <Text style={styles.detailSub}>Renter ID: {selectedBooking.renterID}</Text>
-          <Text style={styles.detailSub}>Listing ID: {selectedBooking.listingD}</Text>
+          <Text style={styles.detailTitle}>
+            {selectedBooking.listingTitle || selectedBooking.listingName || "Property"}
+          </Text>
+          <Text style={styles.detailSub}>
+            {selectedBooking.listingAddress || "Address unavailable"}
+          </Text>
+          <Text style={styles.detailSub}>
+            Renter: {selectedBooking.renterName || selectedBooking.renterID}
+          </Text>
+          <Text style={styles.detailSub}>
+            Viewing date: {formatDateTime(selectedBooking.scheduledAt)}
+          </Text>
 
           <View style={styles.currentStatus}>
             <Text style={styles.currentStatusText}>
@@ -167,13 +183,23 @@ export default function BookingScreen() {
               ) : null}
 
               <View style={styles.cardHeader}>
-                <Text style={styles.name}>{item.listingTitle}</Text>
+                <Text style={styles.name}>
+                  {item.listingTitle || item.listingName || "Property"}
+                </Text>
                 <View style={styles.statusBadge}>
                   <Text style={styles.statusText}>{item.status}</Text>
                 </View>
               </View>
 
-              <Text style={styles.sub}>Tap to review and update status</Text>
+              <Text style={styles.meta}>
+                {item.listingAddress || "Address unavailable"}
+              </Text>
+              <Text style={styles.meta}>
+                Renter: {item.renterName || item.renterID}
+              </Text>
+              <Text style={styles.sub}>
+                Viewing date: {formatDateTime(item.scheduledAt)}
+              </Text>
             </Pressable>
           )}
         />
@@ -245,6 +271,12 @@ const styles = StyleSheet.create({
   sub: {
     fontSize: 12,
     color: colors.textSecondary,
+    marginTop: 6,
+  },
+
+  meta: {
+    fontSize: 13,
+    color: "#4B5563",
     marginTop: 6,
   },
 

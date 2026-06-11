@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../styles/globalStyles";
 import LandlordDashboardScreen from "../features/landlord/LandlordDashboardScreen";
 import BookingScreen from "../features/landlord/BookingScreen";
+import ConversationsListScreen from "../features/chat/ConversationsListScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -47,7 +48,11 @@ export default function LandlordTabs() {
               iconName = "home-outline";
               break;
 
-            case "BookingScreen":
+            case "Chats":
+              iconName = "chatbubbles-outline";
+              break;
+
+            case "Bookings":
               iconName = "calendar-outline";
               break;
 
@@ -60,7 +65,8 @@ export default function LandlordTabs() {
       })}
     >
       <Tab.Screen name="Home" component={LandlordDashboardScreen} />
-      <Tab.Screen name="BookingScreen" component={BookingScreen} />
+      <Tab.Screen name="Chats" component={ConversationsListScreen} />
+      <Tab.Screen name="Bookings" component={BookingScreen} />
     </Tab.Navigator>
   );
 }

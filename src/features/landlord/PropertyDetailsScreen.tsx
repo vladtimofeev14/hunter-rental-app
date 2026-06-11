@@ -12,17 +12,18 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  addDoc,
   arrayRemove,
   arrayUnion,
-  collection,
   doc,
   getDoc,
-  serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 import { colors } from "../../styles/globalStyles";
+import {
+  ensureConversation,
+  getListingLandlordId,
+} from "../chat/chatHelpers";
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -32,7 +33,7 @@ export default function PropertyDetailsScreen({ route, navigation }: any) {
   const [owner, setOwner] = useState<any>(null);
   const [ownerLoading, setOwnerLoading] = useState(false);
   const [favorite, setFavorite] = useState(false);
-  const [bookingLoading, setBookingLoading] = useState(false);
+  const [contactLoading, setContactLoading] = useState(false);
 
   const images = useMemo(
     () =>
@@ -42,6 +43,22 @@ export default function PropertyDetailsScreen({ route, navigation }: any) {
     [listing?.images]
   );
 
+  const getSharedUserProfile = (value: any) => {
+    if (Array.isArray(value)) {
+      return (
+        value.find(
+          (item) => item?.firstName || item?.lastName || item?.email || item?.name
+        ) || null
+      );
+    }
+
+    if (value && typeof value === "object") {
+      return value;
+    }
+
+    return null;
+  };
+
   useEffect(() => {
     const loadListingMeta = async () => {
       if (!listing) return;
@@ -50,31 +67,35 @@ export default function PropertyDetailsScreen({ route, navigation }: any) {
         setOwnerLoading(true);
         setOwner(null);
 
-        let landlordID =
-          listing.landlordID ||
-          listing.landlordId ||
-          listing.ownerID ||
-          listing.ownerId ||
-          listing.userID ||
-          listing.userId;
+        let sharedOwner =
+          getSharedUserProfile(listing.sharedUsers) ||
+          getSharedUserProfile(listing.sharedUser);
+
+        let landlordID = getListingLandlordId(listing);
 
         if (!landlordID && listing.id) {
           const listingSnap = await getDoc(doc(db, "listings", listing.id));
           const listingData = listingSnap.exists() ? listingSnap.data() : null;
-          landlordID =
-            listingData?.landlordID ||
-            listingData?.landlordId ||
-            listingData?.ownerID ||
-            listingData?.ownerId ||
-            listingData?.userID ||
-            listingData?.userId ||
-            null;
+
+          sharedOwner =
+            sharedOwner ||
+            getSharedUserProfile(listingData?.sharedUsers) ||
+            getSharedUserProfile(listingData?.sharedUser);
+
+          landlordID = getListingLandlordId(listingData);
         }
 
         if (landlordID) {
-          const ownerSnap = await getDoc(doc(db, "users", landlordID));
-          if (ownerSnap.exists()) setOwner(ownerSnap.data());
+          const ownerSnap = await getDoc(doc(db, "sharedUsers", landlordID));
+          if (ownerSnap.exists()) {
+            sharedOwner = {
+              ...ownerSnap.data(),
+              ...sharedOwner,
+            };
+          }
         }
+
+        if (sharedOwner) setOwner(sharedOwner);
       } finally {
         setOwnerLoading(false);
       }
@@ -103,6 +124,7 @@ export default function PropertyDetailsScreen({ route, navigation }: any) {
   }
 
   const ownerFullName = [owner?.firstName, owner?.lastName]
+    .map((value) => value?.trim())
     .filter(Boolean)
     .join(" ");
   const ownerName =
@@ -110,6 +132,7 @@ export default function PropertyDetailsScreen({ route, navigation }: any) {
     owner?.name ||
     owner?.email ||
     (ownerLoading ? "Loading owner..." : "Owner unavailable");
+  const ownerPhone = owner?.phoneNumber || "";
 
   const details = [
     { label: "Address", value: listing.address },
@@ -162,57 +185,55 @@ export default function PropertyDetailsScreen({ route, navigation }: any) {
     if (!user || !listing.id) return;
 
     try {
-      setBookingLoading(true);
+      setContactLoading(true);
 
-      let bookingListing = listing;
-
-      let bookingLandlordID =
-        bookingListing.landlordID ||
-        bookingListing.landlordId ||
-        bookingListing.ownerID ||
-        bookingListing.ownerId ||
-        bookingListing.userID ||
-        bookingListing.userId;
+      let chatListing = listing;
+      let bookingLandlordID = getListingLandlordId(chatListing);
 
       if (!bookingLandlordID) {
         const listingSnap = await getDoc(doc(db, "listings", listing.id));
 
         if (listingSnap.exists()) {
-          bookingListing = {
+          chatListing = {
             id: listingSnap.id,
             ...listingSnap.data(),
           };
 
-          bookingLandlordID =
-            bookingListing.landlordID ||
-            bookingListing.landlordId ||
-            bookingListing.ownerID ||
-            bookingListing.ownerId ||
-            bookingListing.userID ||
-            bookingListing.userId;
+          bookingLandlordID = getListingLandlordId(chatListing);
         }
       }
 
       if (!bookingLandlordID) {
-        Alert.alert("Booking unavailable", "Listing owner was not found.");
+        Alert.alert("Chat unavailable", "Listing owner was not found.");
         return;
       }
 
-      await addDoc(collection(db, "bookings"), {
+      const renterSnap = await getDoc(doc(db, "users", user.uid));
+      const renterProfile = renterSnap.exists() ? renterSnap.data() : null;
+      const landlordSnap =
+        owner || !bookingLandlordID
+          ? null
+          : await getDoc(doc(db, "sharedUsers", bookingLandlordID));
+      const landlordProfile =
+        owner || (landlordSnap?.exists() ? landlordSnap.data() : null);
+
+      const conversationId = await ensureConversation({
+        listing: chatListing,
         landlordID: bookingLandlordID,
         renterID: user.uid,
-        listingD: listing.id,
-        listingTitle: bookingListing.name || "Property",
-        listingImage: bookingListing.images?.[0] || "",
-        status: "pending",
-        createdAt: serverTimestamp(),
+        landlordProfile,
+        renterProfile,
+        landlordEmail: landlordProfile?.email,
+        renterEmail: user.email || "",
       });
 
-      navigation.navigate("BookingsListScreen");
+      navigation.navigate("ConversationScreen", {
+        conversationId,
+      });
     } catch (e: any) {
-      Alert.alert("Booking failed", e?.message || "Could not create booking.");
+      Alert.alert("Chat unavailable", e?.message || "Could not open chat.");
     } finally {
-      setBookingLoading(false);
+      setContactLoading(false);
     }
   };
 
@@ -290,13 +311,20 @@ export default function PropertyDetailsScreen({ route, navigation }: any) {
           </Text>
 
           <View style={styles.ownerCard}>
-            <View style={styles.ownerAvatar}>
-              <Ionicons name="person" size={20} color="#fff" />
-            </View>
+            {owner?.avatarUrl ? (
+              <Image source={{ uri: owner.avatarUrl }} style={styles.ownerAvatarImage} />
+            ) : (
+              <View style={styles.ownerAvatar}>
+                <Ionicons name="person" size={20} color="#fff" />
+              </View>
+            )}
 
             <View>
               <Text style={styles.ownerLabel}>Owner</Text>
               <Text style={styles.ownerName}>{ownerName}</Text>
+              {ownerPhone ? (
+                <Text style={styles.ownerPhone}>{ownerPhone}</Text>
+              ) : null}
             </View>
           </View>
 
@@ -322,12 +350,12 @@ export default function PropertyDetailsScreen({ route, navigation }: any) {
 
       <View style={styles.footer}>
         <Pressable
-          style={[styles.button, bookingLoading && styles.buttonDisabled]}
+          style={[styles.button, contactLoading && styles.buttonDisabled]}
           onPress={handleBookViewing}
-          disabled={bookingLoading}
+          disabled={contactLoading}
         >
           <Text style={styles.buttonText}>
-            {bookingLoading ? "Booking..." : "Book Viewing"}
+            {contactLoading ? "Opening chat..." : "Message Landlord"}
           </Text>
         </Pressable>
       </View>
@@ -463,6 +491,13 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
 
+  ownerAvatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
+  },
+
   ownerLabel: {
     fontSize: 12,
     color: "#6B7280",
@@ -473,6 +508,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#111827",
     fontWeight: "800",
+    marginTop: 2,
+  },
+
+  ownerPhone: {
+    fontSize: 13,
+    color: "#4B5563",
     marginTop: 2,
   },
 

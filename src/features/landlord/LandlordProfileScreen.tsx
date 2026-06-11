@@ -1,21 +1,36 @@
 import React, { useEffect, useState } from "react";
 import {
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, writeBatch } from "firebase/firestore";
+import { deleteUser, signOut } from "firebase/auth";
 import { auth, db } from "../../config/firebase";
-import { colors } from "../../styles/globalStyles";
+import { buttons, colors } from "../../styles/globalStyles";
+
+const InfoRow = ({ label, value }: { label: string; value: any }) => (
+  <View style={styles.infoRow}>
+    <Text style={styles.label}>{label}</Text>
+    <Text style={styles.value}>{value}</Text>
+  </View>
+);
 
 export default function LandlordProfileScreen({ navigation }: any) {
   const [profile, setProfile] = useState<any>(null);
+  const [name, setName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
   const user = auth.currentUser;
 
   useEffect(() => {
@@ -25,12 +40,108 @@ export default function LandlordProfileScreen({ navigation }: any) {
       const snap = await getDoc(doc(db, "users", user.uid));
 
       if (snap.exists()) {
-        setProfile(snap.data());
+        const data = snap.data();
+        const loadedName =
+          data?.name ||
+          [data?.firstName, data?.lastName].filter(Boolean).join(" ") ||
+          "Landlord";
+
+        setProfile(data);
+        setName(loadedName);
+        setPhoneNumber(data?.phoneNumber || "");
+        setAvatarUrl(data?.avatarUrl || null);
       }
     };
 
     loadProfile();
-  }, []);
+  }, [user]);
+
+  const splitName = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/).filter(Boolean);
+    const firstName = parts[0] || "";
+    const lastName = parts.slice(1).join(" ");
+
+    return { firstName, lastName };
+  };
+
+  const updateSharedProfile = async (
+    userPayload: Record<string, any>,
+    sharedPayload: Record<string, any>
+  ) => {
+    if (!user) return;
+
+    const batch = writeBatch(db);
+
+    batch.set(doc(db, "users", user.uid), userPayload, { merge: true });
+    batch.set(doc(db, "sharedUsers", user.uid), sharedPayload, { merge: true });
+
+    await batch.commit();
+  };
+
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert("Permission required");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      setAvatarUrl(uri);
+      updateSharedProfile({ avatarUrl: uri }, { avatarUrl: uri });
+    }
+  };
+
+  const saveName = async () => {
+    const cleanName = name.trim();
+    const { firstName, lastName } = splitName(cleanName);
+
+    setEditingName(false);
+    setName(cleanName);
+
+    await updateSharedProfile(
+      {
+        name: cleanName,
+        firstName,
+        lastName,
+      },
+      {
+        firstName,
+        lastName,
+      }
+    );
+
+    setProfile((current: any) => ({
+      ...current,
+      name: cleanName,
+      firstName,
+      lastName,
+    }));
+  };
+
+  const savePhoneNumber = async () => {
+    const cleanPhoneNumber = phoneNumber.trim();
+
+    setPhoneNumber(cleanPhoneNumber);
+
+    await updateSharedProfile(
+      { phoneNumber: cleanPhoneNumber },
+      { phoneNumber: cleanPhoneNumber }
+    );
+
+    setProfile((current: any) => ({
+      ...current,
+      phoneNumber: cleanPhoneNumber,
+    }));
+  };
 
   const logout = () => {
     Alert.alert("Log out", "Are you sure you want to log out?", [
@@ -42,7 +153,7 @@ export default function LandlordProfileScreen({ navigation }: any) {
         text: "Log out",
         style: "destructive",
         onPress: async () => {
-          await auth.signOut();
+          await signOut(auth);
           navigation.reset({
             index: 0,
             routes: [{ name: "Login" }],
@@ -52,11 +163,23 @@ export default function LandlordProfileScreen({ navigation }: any) {
     ]);
   };
 
-  const displayName =
-    profile?.name ||
-    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") ||
-    user?.displayName ||
-    "Landlord";
+  const deleteAccount = async () => {
+    if (!user) return;
+
+    const batch = writeBatch(db);
+
+    batch.delete(doc(db, "users", user.uid));
+    batch.delete(doc(db, "sharedUsers", user.uid));
+
+    await batch.commit();
+    await deleteUser(user);
+
+    navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+  };
+
+  const listingCount = Array.isArray(profile?.listingIDs)
+    ? profile.listingIDs.length
+    : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -66,23 +189,73 @@ export default function LandlordProfileScreen({ navigation }: any) {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={22} color="#fff" />
-          </View>
+          <TouchableOpacity onPress={pickImage}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+            ) : (
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={22} color="#fff" />
+              </View>
+            )}
+          </TouchableOpacity>
 
-          <Text style={styles.title}>Profile</Text>
-          <Text style={styles.subtitle}>Your landlord account</Text>
+          {editingName ? (
+            <View style={styles.nameRow}>
+              <TextInput value={name} onChangeText={setName} style={styles.input} />
+              <TouchableOpacity onPress={saveName}>
+                <Text style={styles.save}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => setEditingName(true)}>
+              <Text style={styles.title}>{name}</Text>
+            </TouchableOpacity>
+          )}
+
+          <Text style={styles.subtitle}>Tap avatar or name to edit</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.item}>Name: {displayName}</Text>
-          <Text style={styles.item}>Email: {profile?.email || user?.email}</Text>
-          <Text style={styles.item}>Role: {profile?.role || "landlord"}</Text>
+          <InfoRow label="Email" value={profile?.email || user?.email} />
+          <InfoRow label="Role" value={profile?.role || "landlord"} />
+          <InfoRow label="Listings" value={listingCount} />
         </View>
 
-        <TouchableOpacity style={styles.secondaryButton} onPress={logout}>
-          <Text style={styles.secondaryText}>Log out</Text>
-        </TouchableOpacity>
+        <View style={styles.card}>
+          <Text style={styles.label}>Phone Number</Text>
+          <TextInput
+            style={styles.phoneInput}
+            placeholder="Enter phone number"
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
+            keyboardType="phone-pad"
+            placeholderTextColor="#9CA3AF"
+          />
+
+          <TouchableOpacity style={styles.savePhoneButton} onPress={savePhoneNumber}>
+            <Text style={styles.savePhoneText}>Save Phone</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={buttons.primary}
+            onPress={() => navigation.navigate("AddListingScreen")}
+          >
+            <Text style={buttons.primaryText}>Add Listing</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[buttons.secondary, styles.actionSpacing]}
+            onPress={logout}
+          >
+            <Text style={buttons.secondaryText}>Log out</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.deleteButton} onPress={deleteAccount}>
+            <Text style={styles.deleteText}>Delete account</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -114,14 +287,12 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    flexGrow: 1,
-    justifyContent: "center",
     padding: 20,
   },
 
   header: {
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 24,
   },
 
   avatar: {
@@ -131,11 +302,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.deepPurple,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 12,
+    marginBottom: 10,
+  },
+
+  avatarImg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 10,
   },
 
   title: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: "800",
     color: "#111827",
   },
@@ -146,29 +324,79 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  input: {
+    borderBottomWidth: 1,
+    borderColor: "#ccc",
+    minWidth: 120,
+    textAlign: "center",
+  },
+
+  phoneInput: {
+    borderBottomWidth: 1,
+    borderColor: "#D1D5DB",
+    paddingVertical: 10,
+    fontSize: 15,
+    color: "#111827",
+  },
+
+  save: {
+    color: colors.deepPurple,
+    fontWeight: "700",
+  },
+
+  savePhoneButton: {
+    marginTop: 12,
+    alignSelf: "flex-start",
+  },
+
+  savePhoneText: {
+    color: colors.deepPurple,
+    fontWeight: "700",
+  },
+
   card: {
     backgroundColor: "#F3F4F6",
-    padding: 16,
+    padding: 14,
     borderRadius: 14,
     marginBottom: 20,
   },
 
-  item: {
-    fontSize: 14,
-    color: "#374151",
-    marginBottom: 6,
+  infoRow: {
+    marginBottom: 12,
   },
 
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingVertical: 16,
-    borderRadius: 999,
+  label: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111827",
+  },
+
+  value: {
+    fontSize: 14,
+    color: "#374151",
+  },
+
+  actions: {
+    marginTop: 10,
+  },
+
+  actionSpacing: {
+    marginTop: 12,
+  },
+
+  deleteButton: {
+    padding: 14,
     alignItems: "center",
   },
 
-  secondaryText: {
-    color: "#111827",
+  deleteText: {
+    color: "red",
     fontWeight: "700",
   },
 });

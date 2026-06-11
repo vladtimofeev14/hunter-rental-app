@@ -11,7 +11,7 @@ import {
 } from "react-native";
 
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, writeBatch } from "firebase/firestore";
 
 import { auth, db } from "../../config/firebase";
 import { colors, buttons } from "../../styles/globalStyles";
@@ -73,14 +73,33 @@ export default function SignupScreen({ navigation }: any) {
 
             const uid = userCredential.user.uid;
 
-            await setDoc(doc(db, "users", uid), {
+            const userPayload: any = {
                 name: cleanName,
                 firstName: cleanFirstName,
                 lastName: cleanLastName,
                 email: cleanEmail,
+                phoneNumber: "",
+                avatarUrl: "",
                 role,
                 createdAt: new Date().toISOString(),
+            };
+
+            if (role === "landlord") {
+                userPayload.listingIDs = [];
+            }
+
+            const batch = writeBatch(db);
+
+            batch.set(doc(db, "users", uid), userPayload);
+            batch.set(doc(db, "sharedUsers", uid), {
+                firstName: cleanFirstName,
+                lastName: cleanLastName,
+                email: cleanEmail,
+                phoneNumber: "",
+                avatarUrl: "",
             });
+
+            await batch.commit();
 
             navigation.reset({
                 index: 0,

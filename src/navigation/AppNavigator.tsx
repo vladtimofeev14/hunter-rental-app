@@ -16,6 +16,8 @@ import ApplicationsScreen from "../features/renter/ApplicationsScreen";
 import NotificationsScreen from "../features/renter/NotificationsScreen";
 import BookingsListScreen from "../features/renter/BookingsListScreen";
 import UserGuideScreen from "../features/renter/UserGuideScreen";
+import ConversationsListScreen from "../features/chat/ConversationsListScreen";
+import ConversationScreen from "../features/chat/ConversationScreen";
 
 // LANDLORD
 import LandlordTabs from "./LandlordTabs";
@@ -24,6 +26,7 @@ import LandlordProfileScreen from "../features/landlord/LandlordProfileScreen";
 import AddListingScreen from "../features/landlord/AddListingScreen";
 import EditListingScreen from "../features/landlord/EditListingScreen";
 import PropertyDetailsScreen from "../features/landlord/PropertyDetailsScreen";
+import CreateBookingScreen from "../features/landlord/CreateBookingScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -45,6 +48,8 @@ export default function AppNavigator() {
       <Stack.Screen name="ApplicationsScreen" component={ApplicationsScreen} />
       <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />
       <Stack.Screen name="UserGuideScreen" component={UserGuideScreen} />
+      <Stack.Screen name="ConversationsListScreen" component={ConversationsListScreen} />
+      <Stack.Screen name="ConversationScreen" component={ConversationScreen} />
 
       {/* LANDLORD & BOOKINGS */}
       <Stack.Screen name="LandlordSetupScreen" component={LandlordSetupScreen} />
@@ -54,6 +59,7 @@ export default function AppNavigator() {
       <Stack.Screen name="EditListingScreen" component={EditListingScreen} />
       <Stack.Screen name="PropertyDetailsScreen" component={PropertyDetailsScreen} />
       <Stack.Screen name="BookingsListScreen" component={BookingsListScreen} />
+      <Stack.Screen name="CreateBookingScreen" component={CreateBookingScreen} />
 
     </Stack.Navigator>
   );

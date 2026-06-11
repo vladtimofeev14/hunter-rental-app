@@ -13,7 +13,7 @@ import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../config/firebase";
-import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, writeBatch } from "firebase/firestore";
 import { deleteUser, signOut } from "firebase/auth";
 import { colors, buttons } from "../../styles/globalStyles";
 import { CAMPUSES } from "./data/campuses";
@@ -28,6 +28,7 @@ const InfoRow = ({ label, value }: { label: string; value: any }) => (
 export default function RenterProfileScreen({ navigation }: any) {
   const [prefs, setPrefs] = useState<any>(null);
   const [name, setName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
 
@@ -46,6 +47,7 @@ export default function RenterProfileScreen({ navigation }: any) {
         const data = snap.data();
         setPrefs(data?.renterPreferences || null);
         setName(data?.name || "User");
+        setPhoneNumber(data?.phoneNumber || "");
         setAvatarUrl(data?.avatarUrl || null);
       }
     };
@@ -53,9 +55,26 @@ export default function RenterProfileScreen({ navigation }: any) {
     load();
   }, [user]);
 
-  const updateUserField = async (field: string, value: any) => {
+  const splitName = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/).filter(Boolean);
+    const firstName = parts[0] || "";
+    const lastName = parts.slice(1).join(" ");
+
+    return { firstName, lastName };
+  };
+
+  const updateSharedProfile = async (
+    userPayload: Record<string, any>,
+    sharedPayload: Record<string, any>
+  ) => {
     if (!user) return;
-    await updateDoc(doc(db, "users", user.uid), { [field]: value });
+
+    const batch = writeBatch(db);
+
+    batch.set(doc(db, "users", user.uid), userPayload, { merge: true });
+    batch.set(doc(db, "sharedUsers", user.uid), sharedPayload, { merge: true });
+
+    await batch.commit();
   };
 
   const pickImage = async () => {
@@ -76,13 +95,39 @@ export default function RenterProfileScreen({ navigation }: any) {
     if (!result.canceled) {
       const uri = result.assets[0].uri;
       setAvatarUrl(uri);
-      updateUserField("avatarUrl", uri);
+      updateSharedProfile({ avatarUrl: uri }, { avatarUrl: uri });
     }
   };
 
   const saveName = async () => {
+    const cleanName = name.trim();
+    const { firstName, lastName } = splitName(cleanName);
+
     setEditingName(false);
-    await updateUserField("name", name);
+    setName(cleanName);
+
+    await updateSharedProfile(
+      {
+        name: cleanName,
+        firstName,
+        lastName,
+      },
+      {
+        firstName,
+        lastName,
+      }
+    );
+  };
+
+  const savePhoneNumber = async () => {
+    const cleanPhoneNumber = phoneNumber.trim();
+
+    setPhoneNumber(cleanPhoneNumber);
+
+    await updateSharedProfile(
+      { phoneNumber: cleanPhoneNumber },
+      { phoneNumber: cleanPhoneNumber }
+    );
   };
 
   const logout = async () => {
@@ -93,7 +138,12 @@ export default function RenterProfileScreen({ navigation }: any) {
   const deleteAccount = async () => {
     if (!user) return;
 
-    await deleteDoc(doc(db, "users", user.uid));
+    const batch = writeBatch(db);
+
+    batch.delete(doc(db, "users", user.uid));
+    batch.delete(doc(db, "sharedUsers", user.uid));
+
+    await batch.commit();
     await deleteUser(user);
 
     navigation.reset({ index: 0, routes: [{ name: "Login" }] });
@@ -128,6 +178,23 @@ export default function RenterProfileScreen({ navigation }: any) {
           )}
 
           <Text style={styles.subtitle}>Tap avatar or name to edit</Text>
+        </View>
+
+        {/* CONTACT */}
+        <View style={styles.card}>
+          <Text style={styles.label}>Phone Number</Text>
+          <TextInput
+            style={styles.phoneInput}
+            placeholder="Enter phone number"
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
+            keyboardType="phone-pad"
+            placeholderTextColor="#9CA3AF"
+          />
+
+          <TouchableOpacity style={styles.savePhoneButton} onPress={savePhoneNumber}>
+            <Text style={styles.savePhoneText}>Save Phone</Text>
+          </TouchableOpacity>
         </View>
 
         {/* PREFERENCES */}
@@ -245,7 +312,25 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
+  phoneInput: {
+    borderBottomWidth: 1,
+    borderColor: "#D1D5DB",
+    paddingVertical: 10,
+    fontSize: 15,
+    color: "#111827",
+  },
+
   save: {
+    color: colors.deepPurple,
+    fontWeight: "700",
+  },
+
+  savePhoneButton: {
+    marginTop: 12,
+    alignSelf: "flex-start",
+  },
+
+  savePhoneText: {
     color: colors.deepPurple,
     fontWeight: "700",
   },
