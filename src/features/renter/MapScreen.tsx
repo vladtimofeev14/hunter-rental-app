@@ -1,35 +1,56 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Dimensions } from "react-native";
-import MapView, { Marker, Region, Callout } from "react-native-maps";
+import { View, Text, StyleSheet, Dimensions, Pressable } from "react-native";
+import MapView, { Marker, Region } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../config/firebase";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../../config/firebase";
+import { getUserLocation } from "./utils/location";
 
 export default function MapScreen({ navigation }: any) {
   const [listings, setListings] = useState<any[]>([]);
+  const [setPrefs] = useState<any>(null);
+  const [userLocation, setUserLocation] = useState<any>(null);
+  const [selected, setSelected] = useState<any>(null);
 
+  const user = auth.currentUser;
+
+  // LOCATION
+  useEffect(() => {
+    const loadLocation = async () => {
+      const loc = await getUserLocation();
+      if (loc) setUserLocation(loc);
+    };
+    loadLocation();
+  }, []);
+
+  // PREFS 
+  useEffect(() => {
+    const loadPrefs = async () => {
+      if (!user) return;
+
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if (snap.exists()) {
+        setPrefs(snap.data()?.renterPreferences || null);
+      }
+    };
+
+    loadPrefs();
+  }, []);
+
+  // LISTINGS
   useEffect(() => {
     const loadListings = async () => {
-      try {
-        const snap = await getDocs(collection(db, "listings"));
-
-        const data = snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        setListings(data);
-      } catch (error) {
-        console.log("Map load error:", error);
-      }
+      const snap = await getDocs(collection(db, "listings"));
+      setListings(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     };
 
     loadListings();
   }, []);
 
+  // VALID COORDS 
   const validListings = useMemo(() => {
     return listings.filter(
-      (l: any) =>
+      (l) =>
         typeof l.lat === "number" &&
         typeof l.lng === "number" &&
         !isNaN(l.lat) &&
@@ -37,91 +58,135 @@ export default function MapScreen({ navigation }: any) {
     );
   }, [listings]);
 
-  const defaultRegion: Region = {
-    latitude: 43.6532,
-    longitude: -79.3832,
-    latitudeDelta: 0.08,
-    longitudeDelta: 0.08,
-  };
+  const visibleListings = useMemo(() => {
+    return validListings;
+  }, [validListings]);
 
-  const initialRegion =
-    validListings.length > 0
-      ? {
-        latitude: validListings[0].lat,
-        longitude: validListings[0].lng,
-        latitudeDelta: 0.08,
-        longitudeDelta: 0.08,
-      }
-      : defaultRegion;
+  // INITIAL REGION (campus -> user -> fallback)
+  const initialRegion: Region = useMemo(() => {
+    if (userLocation) {
+      return {
+        latitude: userLocation.lat,
+        longitude: userLocation.lng,
+        latitudeDelta: 0.06,
+        longitudeDelta: 0.06,
+      };
+    }
+
+    if (visibleListings.length > 0) {
+      return {
+        latitude: visibleListings[0].lat,
+        longitude: visibleListings[0].lng,
+        latitudeDelta: 0.06,
+        longitudeDelta: 0.06,
+      };
+    }
+
+    return {
+      latitude: 43.6532,
+      longitude: -79.3832,
+      latitudeDelta: 0.08,
+      longitudeDelta: 0.08,
+    };
+  }, [userLocation, visibleListings]);
 
   return (
-    <SafeAreaView edges={["top", "left", "right"]} style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <MapView style={styles.map} initialRegion={initialRegion}>
-        {validListings.map((item: any) => (
+        {visibleListings.map((item) => (
           <Marker
             key={item.id}
             coordinate={{ latitude: item.lat, longitude: item.lng }}
-            onPress={() =>
-              navigation.navigate("PropertyDetailsScreen", { listing: item })
-            }
+            anchor={{ x: 0.5, y: 1 }}
+            onPress={() => setSelected(item)}
           >
-            <Callout tooltip>
-              <View style={styles.priceMarker}>
-                <Text style={styles.priceText}>
-                  ${item.price?.amount}
+            <View style={styles.markerContainer}>
+              <View style={styles.pill}>
+                <Text style={styles.price}>
+                  ${item.price?.amount ?? "—"}
                 </Text>
               </View>
-            </Callout>
+            </View>
           </Marker>
         ))}
       </MapView>
 
-      <View style={styles.debug}>
-        <Text style={styles.text}>
-          Properties: {validListings.length}
-        </Text>
-      </View>
+      {selected && (
+        <Pressable
+          style={styles.card}
+          onPress={() =>
+            navigation.navigate("PropertyDetailsScreen", {
+              listing: selected,
+            })
+          }
+        >
+          <Text style={styles.title}>{selected.name || "Property"}</Text>
+
+          <Text style={styles.subtitle}>
+            ${selected.price?.amount ?? "—"} · {selected.leaseLength || "—"}
+          </Text>
+
+          <Text style={styles.city}>{selected.city || "Unknown"}</Text>
+        </Pressable>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
 
   map: {
     width: Dimensions.get("window").width,
     height: "100%",
   },
 
-  priceMarker: {
+  markerContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  pill: {
     backgroundColor: "#0D74E7",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: "#fff",
   },
 
-  priceText: {
+  price: {
     color: "#fff",
-    fontWeight: "700",
-    fontSize: 12,
+    fontSize: 9,
+    fontWeight: "900",
+    textAlign: "center",
   },
 
-  debug: {
+  card: {
     position: "absolute",
-    bottom: 20,
-    alignSelf: "center",
-    backgroundColor: "#111827",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    bottom: 120,
+    left: 16,
+    right: 16,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 14,
   },
 
-  text: {
-    color: "#fff",
+  title: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#111827"
+  },
+
+  subtitle: {
+    fontSize: 13,
+    marginTop: 4,
+    color: "#4B5563"
+  },
+
+  city: {
     fontSize: 12,
+    marginTop: 2,
+    color: "#6B7280"
   },
 });

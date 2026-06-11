@@ -2,20 +2,31 @@ import React, { useEffect, useState } from "react";
 import {
     View,
     Text,
-    TextInput,
     TouchableOpacity,
-    ScrollView,
     StyleSheet,
+    Modal,
+    FlatList,
+    ScrollView,
 } from "react-native";
 import Slider from "@react-native-community/slider";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
-import { colors } from "../../styles/globalStyles";
+import { colors, buttons } from "../../styles/globalStyles";
+
+import { CAMPUSES } from "./data/campuses";
 
 const LEASE_OPTIONS = ["4", "8", "12"];
 const HOUSING_OPTIONS = ["Shared", "Private"];
-const LIFESTYLES = ["Quiet", "Social", "Studious", "Night Owl", "Clean", "Budget-focused"];
+const PROPERTY_TYPES = ["Condo", "House", "Studio"];
+const LIFESTYLES = [
+    "Quiet",
+    "Social",
+    "Studious",
+    "Night Owl",
+    "Clean",
+    "Budget-focused",
+];
 
 export default function RenterPreferencesScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
@@ -24,37 +35,37 @@ export default function RenterPreferencesScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
 
     const [budget, setBudget] = useState(1200);
-    const [campus, setCampus] = useState("");
+    const [campusId, setCampusId] = useState<string | null>(null);
+
     const [lease, setLease] = useState("8");
     const [housing, setHousing] = useState("Shared");
-    const [furnished, setFurnished] = useState(true);
+    const [propertyType, setPropertyType] = useState<string | null>(null);
+
     const [lifestyle, setLifestyle] = useState<string[]>([]);
     const [maxDistanceKm, setMaxDistanceKm] = useState(10);
 
-    // 🔥 LOAD EXISTING DATA (THIS FIXES YOUR RESET BUG)
+    const [campusModal, setCampusModal] = useState(false);
+
+    const selectedCampus = CAMPUSES.find((c) => c.id === campusId);
+
     useEffect(() => {
         const loadPrefs = async () => {
             if (!user) return;
 
-            try {
-                const snap = await getDoc(doc(db, "users", user.uid));
+            const snap = await getDoc(doc(db, "users", user.uid));
+            const prefs = snap.exists() ? snap.data()?.renterPreferences : null;
 
-                const prefs = snap.exists() ? snap.data()?.renterPreferences : null;
-
-                if (prefs) {
-                    setBudget(prefs.budget ?? 1200);
-                    setCampus(prefs.campus ?? "");
-                    setLease(prefs.leaseDuration ?? "8");
-                    setHousing(prefs.housingType ?? "Shared");
-                    setFurnished(prefs.furnished ?? true);
-                    setLifestyle(prefs.lifestylePreferences ?? []);
-                    setMaxDistanceKm(prefs.maxDistanceKm ?? 10);
-                }
-            } catch (e) {
-                console.log("Prefs load error:", e);
-            } finally {
-                setLoading(false);
+            if (prefs) {
+                setBudget(prefs.budget ?? 1200);
+                setCampusId(prefs.campusId ?? null);
+                setLease(prefs.leaseLength ? prefs.leaseLength.replace(" Month", "") : "8");
+                setHousing(prefs.housingType ?? "Shared");
+                setPropertyType(prefs.propertyType ?? null);
+                setLifestyle(prefs.lifestylePreferences ?? []);
+                setMaxDistanceKm(prefs.maxDistanceKm ?? 10);
             }
+
+            setLoading(false);
         };
 
         loadPrefs();
@@ -62,7 +73,9 @@ export default function RenterPreferencesScreen({ navigation }: any) {
 
     const toggleLifestyle = (item: string) => {
         setLifestyle((prev) =>
-            prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]
+            prev.includes(item)
+                ? prev.filter((x) => x !== item)
+                : [...prev, item]
         );
     };
 
@@ -71,37 +84,36 @@ export default function RenterPreferencesScreen({ navigation }: any) {
 
         const payload = {
             budget,
-            campus,
-            leaseDuration: lease,
+            campusId,
+            campusName: selectedCampus?.name ?? null,
+            campusLat: selectedCampus?.lat ?? null,
+            campusLng: selectedCampus?.lng ?? null,
+            leaseLength: lease ? `${lease} Month` : null,
             housingType: housing,
-            furnished,
+            propertyType,
             lifestylePreferences: lifestyle,
             maxDistanceKm,
             updatedAt: new Date().toISOString(),
         };
 
-        try {
-            await setDoc(
-                doc(db, "users", user.uid),
-                {
-                    renterPreferences: payload,
-                    hasCompletedPreferences: true,
-                },
-                { merge: true }
-            );
+        await setDoc(
+            doc(db, "users", user.uid),
+            {
+                renterPreferences: payload,
+                hasCompletedPreferences: true,
+            },
+            { merge: true }
+        );
 
-            navigation.reset({
-                index: 0,
-                routes: [{ name: "RenterTabs" }],
-            });
-        } catch (error) {
-            console.log("Firestore save error:", error);
-        }
+        navigation.reset({
+            index: 0,
+            routes: [{ name: "RenterTabs" }],
+        });
     };
 
     if (loading) {
         return (
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <View style={styles.loading}>
                 <Text>Loading...</Text>
             </View>
         );
@@ -110,192 +122,278 @@ export default function RenterPreferencesScreen({ navigation }: any) {
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView
+                contentContainerStyle={[
+                    styles.content,
+                    {
+                        paddingTop: insets.top + 16,
+                        paddingBottom: insets.bottom + 120,
+                    },
+                ]}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
             >
-                <View style={styles.header}>
-                    <Text style={styles.title}>Preferences</Text>
-                    <Text style={styles.subtitle}>Define your ideal living setup.</Text>
+                <Text style={styles.title}>Preferences</Text>
+
+                {/* BUDGET */}
+                <Text style={styles.label}>Budget</Text>
+                <Text style={styles.valueText}>${budget}</Text>
+                <Slider
+                    minimumValue={500}
+                    maximumValue={3000}
+                    step={50}
+                    value={budget}
+                    onValueChange={setBudget}
+                />
+
+                {/* CAMPUS */}
+                <Text style={styles.label}>Campus</Text>
+                <TouchableOpacity
+                    style={styles.selector}
+                    onPress={() => setCampusModal(true)}
+                >
+                    <Text style={styles.selectorText}>
+                        {selectedCampus ? selectedCampus.name : "Select campus"}
+                    </Text>
+                </TouchableOpacity>
+
+                {/* DISTANCE */}
+                <Text style={styles.label}>Max Distance</Text>
+                <Text style={styles.valueText}>{maxDistanceKm} km</Text>
+                <Slider
+                    minimumValue={1}
+                    maximumValue={30}
+                    step={1}
+                    value={maxDistanceKm}
+                    onValueChange={setMaxDistanceKm}
+                />
+
+                {/* LEASE */}
+                <Text style={styles.label}>Lease</Text>
+                <View style={styles.row}>
+                    {LEASE_OPTIONS.map((o) => (
+                        <TouchableOpacity
+                            key={o}
+                            onPress={() => setLease(o)}
+                            style={[
+                                styles.toggle,
+                                lease === o && styles.toggleActive,
+                            ]}
+                        >
+                            <Text>{o} mo</Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
 
-                <View style={styles.form}>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Monthly Budget</Text>
-                        <Text style={styles.valueText}>${budget}</Text>
-                        <Slider
-                            minimumValue={500}
-                            maximumValue={3000}
-                            step={50}
-                            value={budget}
-                            onValueChange={setBudget}
-                            minimumTrackTintColor={colors.primaryBlue}
-                            maximumTrackTintColor="#E5E7EB"
-                            thumbTintColor={colors.primaryBlue}
-                        />
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Preferred Campus</Text>
-                        <TextInput
-                            value={campus}
-                            onChangeText={setCampus}
-                            placeholder="e.g. George Brown College"
-                            style={styles.input}
-                        />
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Max Distance (km)</Text>
-                        <Text style={styles.valueText}>{maxDistanceKm} km</Text>
-                        <Slider
-                            minimumValue={1}
-                            maximumValue={30}
-                            step={1}
-                            value={maxDistanceKm}
-                            onValueChange={setMaxDistanceKm}
-                            minimumTrackTintColor={colors.primaryBlue}
-                            maximumTrackTintColor="#E5E7EB"
-                            thumbTintColor={colors.primaryBlue}
-                        />
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Lease Length</Text>
-                        <View style={styles.row}>
-                            {LEASE_OPTIONS.map((option) => (
-                                <TouchableOpacity
-                                    key={option}
-                                    style={[styles.toggle, lease === option && styles.toggleActive]}
-                                    onPress={() => setLease(option)}
-                                >
-                                    <Text style={[styles.toggleText, lease === option && styles.toggleTextActive]}>
-                                        {option} mo
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Housing Type</Text>
-                        <View style={styles.row}>
-                            {HOUSING_OPTIONS.map((option) => (
-                                <TouchableOpacity
-                                    key={option}
-                                    style={[styles.toggle, housing === option && styles.toggleActive]}
-                                    onPress={() => setHousing(option)}
-                                >
-                                    <Text style={[styles.toggleText, housing === option && styles.toggleTextActive]}>
-                                        {option}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Lifestyle</Text>
-                        <View style={styles.chips}>
-                            {LIFESTYLES.map((item) => (
-                                <TouchableOpacity
-                                    key={item}
-                                    style={[styles.chip, lifestyle.includes(item) && styles.chipActive]}
-                                    onPress={() => toggleLifestyle(item)}
-                                >
-                                    <Text style={styles.chipText}>{item}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
+                {/* HOUSING */}
+                <Text style={styles.label}>Housing</Text>
+                <View style={styles.row}>
+                    {HOUSING_OPTIONS.map((o) => (
+                        <TouchableOpacity
+                            key={o}
+                            onPress={() => setHousing(o)}
+                            style={[
+                                styles.toggle,
+                                housing === o && styles.toggleActive,
+                            ]}
+                        >
+                            <Text>{o}</Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
 
-                <View style={{ height: 120 }} />
+                {/* PROPERTY TYPE */}
+                <Text style={styles.label}>Property Type</Text>
+                <View style={styles.row}>
+                    {PROPERTY_TYPES.map((type) => (
+                        <TouchableOpacity
+                            key={type}
+                            onPress={() =>
+                                setPropertyType(propertyType === type ? null : type)
+                            }
+                            style={[
+                                styles.toggle,
+                                propertyType === type && styles.toggleActive,
+                            ]}
+                        >
+                            <Text>{type}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                {/* LIFESTYLE */}
+                <Text style={styles.label}>Lifestyle</Text>
+                <View style={styles.chips}>
+                    {LIFESTYLES.map((l) => (
+                        <TouchableOpacity
+                            key={l}
+                            onPress={() => toggleLifestyle(l)}
+                            style={[
+                                styles.chip,
+                                lifestyle.includes(l) && styles.chipActive,
+                            ]}
+                        >
+                            <Text>{l}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                {/* SAVE BUTTON */}
+                <TouchableOpacity style={buttons.primary} onPress={handleSave}>
+                    <Text style={buttons.primaryText}>Save Preferences</Text>
+                </TouchableOpacity>
             </ScrollView>
 
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.button} onPress={handleSave}>
-                    <Text style={styles.buttonText}>Save Preferences</Text>
-                </TouchableOpacity>
-            </View>
+            {/* CAMPUS MODAL */}
+            <Modal visible={campusModal} animationType="slide">
+                <SafeAreaView style={styles.modal}>
+                    <FlatList
+                        data={CAMPUSES}
+                        keyExtractor={(item) => item.id}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={[
+                                    styles.campusItem,
+                                    campusId === item.id && styles.campusActive,
+                                ]}
+                                onPress={() => {
+                                    setCampusId(item.id);
+                                    setCampusModal(false);
+                                }}
+                            >
+                                <Text style={styles.campusText}>
+                                    {item.name} - {item.city}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    />
+
+                    <TouchableOpacity
+                        onPress={() => setCampusModal(false)}
+                        style={buttons.primary}
+                    >
+                        <Text style={buttons.primaryText}>Close</Text>
+                    </TouchableOpacity>
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#FFFFFF" },
-    content: { paddingHorizontal: 24, paddingBottom: 24 },
-    header: { marginBottom: 28, alignItems: "center" },
-    title: { fontSize: 28, fontWeight: "800", color: "#111827" },
-    subtitle: { fontSize: 13, color: "#6B7280", textAlign: "center" },
-
-    form: { gap: 20 },
-
-    inputGroup: { gap: 10 },
-
-    label: { fontSize: 13, fontWeight: "600", color: "#374151" },
-
-    valueText: { fontSize: 16, fontWeight: "700", color: colors.primaryBlue },
-
-    input: {
-        backgroundColor: "#F3F4F6",
-        padding: 14,
-        borderRadius: 14,
+    container: {
+        flex: 1,
+        backgroundColor: colors.white,
     },
 
-    row: { flexDirection: "row", gap: 10 },
+    content: {
+        flexGrow: 1,
+        paddingHorizontal: 24,
+        paddingBottom: 40,
+    },
+
+    loading: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+
+    title: {
+        fontSize: 28,
+        fontWeight: "800",
+        color: "#111827",
+        marginBottom: 18,
+    },
+
+    label: {
+        fontSize: 13,
+        fontWeight: "600",
+        color: colors.textSecondary,
+        marginTop: 18,
+        marginBottom: 6,
+    },
+
+    valueText: {
+        fontSize: 16,
+        fontWeight: "700",
+        color: colors.primaryBlue,
+        marginBottom: 6,
+    },
+
+    selector: {
+        backgroundColor: colors.lightBlueAccent,
+        padding: 14,
+        borderRadius: 14,
+        marginBottom: 10,
+    },
+
+    selectorText: {
+        fontSize: 14,
+        color: "#111827",
+        fontWeight: "500",
+    },
+
+    row: {
+        flexDirection: "row",
+        gap: 10,
+        marginTop: 6,
+    },
 
     toggle: {
         flex: 1,
         paddingVertical: 12,
-        borderRadius: 12,
-        backgroundColor: "#F3F4F6",
+        borderRadius: 14,
+        backgroundColor: colors.lightBlueAccent,
         alignItems: "center",
     },
 
     toggleActive: {
-        backgroundColor: "#E5EBFB",
+        backgroundColor: colors.white,
         borderWidth: 1,
         borderColor: colors.primaryBlue,
     },
 
-    toggleText: { fontSize: 13, color: "#6B7280" },
-
-    toggleTextActive: { color: colors.primaryBlue, fontWeight: "700" },
-
-    chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    chips: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+        marginTop: 6,
+        marginBottom: 24,
+    },
 
     chip: {
         paddingVertical: 8,
         paddingHorizontal: 12,
         borderRadius: 20,
-        backgroundColor: "#F3F4F6",
+        backgroundColor: colors.lightBlueAccent,
     },
 
     chipActive: {
-        backgroundColor: "#E5EBFB",
-        borderColor: colors.primaryBlue,
+        backgroundColor: colors.white,
         borderWidth: 1,
+        borderColor: colors.primaryBlue,
     },
 
-    chipText: { fontSize: 12, color: "#4B5563" },
-
-    footer: {
-        padding: 20,
-        borderTopWidth: 1,
-        borderTopColor: "#F3F4F6",
-        backgroundColor: "#fff",
+    campusItem: {
+        padding: 14,
+        marginHorizontal: 16,
+        marginTop: 10,
+        borderRadius: 12,
+        backgroundColor: colors.lightBlueAccent,
     },
 
-    button: {
-        backgroundColor: colors.deepPurple,
-        paddingVertical: 16,
-        borderRadius: 999,
-        alignItems: "center",
+    campusActive: {
+        backgroundColor: colors.white,
+        borderWidth: 1,
+        borderColor: colors.primaryBlue,
     },
 
-    buttonText: {
-        color: "white",
-        fontSize: 15,
-        fontWeight: "700",
+    campusText: {
+        fontSize: 13,
+        fontWeight: "500",
+        color: "#111827",
+    },
+
+    modal: {
+        flex: 1,
+        backgroundColor: colors.white,
     },
 });

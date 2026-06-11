@@ -1,42 +1,38 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { View, TextInput, FlatList, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 import ListingCard from "./components/ListingCard";
 import FilterBar from "./components/FilterBar";
-import { Filters } from "./components/types";
+import { Filters } from "./utils/types";
+import { getUserLocation } from "./utils/location";
+import { CAMPUSES } from "./data/campuses";
+import { getDistanceKm } from "./utils/distance";
 
-const getDistanceKm = (
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-) => {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+const TAB_OVERLAP = 90;
 
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLng / 2) ** 2;
-
-  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+const parseLease = (val: string | null) => {
+  if (!val) return null;
+  const num = parseInt(val);
+  return isNaN(num) ? null : num;
 };
 
 export default function SearchScreen({ navigation }: any) {
   const [listings, setListings] = useState<any[]>([]);
   const [prefs, setPrefs] = useState<any>(null);
   const [query, setQuery] = useState("");
+  const [userLocation, setUserLocation] = useState<any>(null);
 
   const [filters, setFilters] = useState<Filters>({
     bedrooms: null,
     furnished: null,
-    sortBy: "match",
+    propertyType: null,
+    leaseLength: null,
+    sortBy: "relevance",
   });
 
+  // LOAD LISTINGS
   useEffect(() => {
     const load = async () => {
       const snap = await getDocs(collection(db, "listings"));
@@ -45,82 +41,120 @@ export default function SearchScreen({ navigation }: any) {
     load();
   }, []);
 
+  // LOAD PREFS 
   useEffect(() => {
     const loadPrefs = async () => {
       const user = auth.currentUser;
       if (!user) return;
 
-      const snap = await getDoc(doc(db, "users", user.uid));
-      if (snap.exists()) {
-        setPrefs(snap.data()?.renterPreferences || null);
-      }
+      const snap = await getDocs(collection(db, "users"));
+      const userDoc = snap.docs.find(d => d.id === user.uid);
+      setPrefs(userDoc?.data()?.renterPreferences || null);
     };
     loadPrefs();
   }, []);
 
-  const ranked = useMemo(() => {
-    if (!listings.length) return [];
+  // LOCATION
+  useEffect(() => {
+    const loadLocation = async () => {
+      const loc = await getUserLocation();
+      setUserLocation(loc);
+    };
+    loadLocation();
+  }, []);
 
-    let results = listings.map((l) => {
-      let score = 0;
+  const results = useMemo(() => {
+    let data = [...listings];
+    const q = query.trim().toLowerCase();
 
-      const price = l.price?.amount ?? Infinity;
+    const campus = CAMPUSES.find(c => c.id === prefs?.campusId);
 
-      const distance =
-        prefs?.userLat && prefs?.userLng && l.lat && l.lng
-          ? getDistanceKm(
-            prefs.userLat,
-            prefs.userLng,
-            l.lat,
-            l.lng
-          )
-          : null;
+    // TEXT SEARCH 
+    if (q) {
+      data = data.filter((l) =>
+        l.city?.toLowerCase().includes(q) ||
+        l.address?.toLowerCase().includes(q) ||
+        l.name?.toLowerCase().includes(q)
+      );
+    }
 
-      if (prefs?.budget && price <= prefs.budget) score += 40;
-
-      if (distance !== null) {
-        score += Math.max(0, 30 - distance * 2);
-      }
-
-      if (prefs?.bedrooms && l.bedrooms === prefs.bedrooms) {
-        score += 10;
-      }
-
-      if (prefs?.furnished !== undefined && l.furnished === prefs.furnished) {
-        score += 10;
-      }
-
-      if (query.trim()) {
-        const q = query.toLowerCase();
-        if (
-          (l.city || "").toLowerCase().includes(q) ||
-          (l.address || "").toLowerCase().includes(q)
-        ) {
-          score += 10;
-        }
-      }
-
-      return { ...l, score, distance, price };
-    });
-
+    // USER FILTERS 
     if (filters.bedrooms !== null) {
-      results = results.filter((l) => l.bedrooms === filters.bedrooms);
+      data = data.filter((l) => l.bedrooms === filters.bedrooms);
     }
 
     if (filters.furnished !== null) {
-      results = results.filter((l) => l.furnished === filters.furnished);
+      data = data.filter((l) => l.furnished === filters.furnished);
     }
 
+    if (filters.propertyType) {
+      data = data.filter((l) => l.propertyType === filters.propertyType);
+    }
+
+    if (filters.leaseLength) {
+      const lease = parseLease(filters.leaseLength);
+      data = data.filter((l) => {
+        if (!l?.leaseLengthMonths) return true;
+        return l.leaseLengthMonths === lease;
+      });
+    }
+
+    // DISTANCE 
+    data = data.map((l) => {
+      let distance = null;
+
+      if (campus && l.lat && l.lng) {
+        distance = getDistanceKm(campus.lat, campus.lng, l.lat, l.lng);
+      } else if (userLocation && l.lat && l.lng) {
+        distance = getDistanceKm(
+          userLocation.lat,
+          userLocation.lng,
+          l.lat,
+          l.lng
+        );
+      }
+
+      return { ...l, distance };
+    });
+
+    // SORTING
     if (filters.sortBy === "price") {
-      results.sort((a, b) => a.price - b.price);
-    } else if (filters.sortBy === "distance") {
-      results.sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
-    } else {
-      results.sort((a, b) => b.score - a.score);
+      data.sort((a, b) => (a.price?.amount ?? 0) - (b.price?.amount ?? 0));
     }
 
-    return results;
-  }, [listings, prefs, query, filters]);
+    if (filters.sortBy === "distance") {
+      data.sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
+    }
+
+    if (filters.sortBy === "relevance") {
+      data.sort((a, b) => {
+        let aScore = 0;
+        let bScore = 0;
+
+        if (prefs?.budget) {
+          if ((a.price?.amount ?? 0) <= prefs.budget) aScore++;
+          if ((b.price?.amount ?? 0) <= prefs.budget) bScore++;
+        }
+
+        if (prefs?.propertyType) {
+          if (a.propertyType === prefs.propertyType) aScore++;
+          if (b.propertyType === prefs.propertyType) bScore++;
+        }
+
+        if (prefs?.housingType) {
+          if (a.housingType === prefs.housingType) aScore++;
+          if (b.housingType === prefs.housingType) bScore++;
+        }
+
+        if ((a.distance ?? 999) < 5) aScore++;
+        if ((b.distance ?? 999) < 5) bScore++;
+
+        return bScore - aScore;
+      });
+    }
+
+    return data;
+  }, [listings, prefs, query, filters, userLocation]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -136,19 +170,24 @@ export default function SearchScreen({ navigation }: any) {
       <FilterBar filters={filters} setFilters={setFilters} />
 
       <FlatList
-        data={ranked}
+        data={results}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <ListingCard item={item} navigation={navigation} />
         )}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: TAB_OVERLAP }}
+        showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F6F7FB" },
+  container: {
+    flex: 1,
+    backgroundColor: "#F6F7FB"
+  },
+
   searchBox: {
     margin: 12,
     backgroundColor: "#fff",
@@ -157,5 +196,8 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: "center",
   },
-  searchInput: { fontSize: 14 },
+
+  searchInput: {
+    fontSize: 14
+  },
 });

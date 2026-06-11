@@ -1,14 +1,14 @@
 {
   "expo": {
     "name": "Hunter",
-    "slug": "HunterRentalApp",
+    "slug": "Hunter",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/blue-icon-white-background.png",
+    "icon": "./assets/purple-icon-white-background.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/purple-icon-white-background.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,14 +17,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/blue-icon-white-background.png",
+        "foregroundImage": "./assets/purple-icon-white-background.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/blue-icon-white-background.png"
+      "favicon": "./assets/purple-icon-white-background.png"
     }
   }
 }

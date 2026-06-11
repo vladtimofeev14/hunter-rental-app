@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SymbolView } from "expo-symbols";
+import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 import { colors } from "../../styles/globalStyles";
@@ -67,7 +67,7 @@ export default function LandlordProfileScreen({ navigation }: any) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View style={styles.avatar}>
-            <SymbolView name="person" size={22} tintColor="#fff" />
+            <Ionicons name="person" size={22} color="#fff" />
           </View>
 
           <Text style={styles.title}>Profile</Text>

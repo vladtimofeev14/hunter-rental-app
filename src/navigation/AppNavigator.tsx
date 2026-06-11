@@ -10,14 +10,15 @@ import SignupScreen from "../features/auth/SignupScreen";
 import RenterProfileScreen from "../features/renter/RenterProfileScreen";
 import RenterPreferencesScreen from "../features/renter/RenterPreferencesScreen";
 import RenterTabs from "./RenterTabs";
-import LandlordTabs from "./LandlordTabs";
 import MapScreen from "../features/renter/MapScreen";
 import SavedListingsScreen from "../features/renter/SavedListingsScreen";
 import ApplicationsScreen from "../features/renter/ApplicationsScreen";
 import NotificationsScreen from "../features/renter/NotificationsScreen";
-import BookingsListScreen from "../features/renter/BookingsListScreen"; 
+import BookingsListScreen from "../features/renter/BookingsListScreen";
+import UserGuideScreen from "../features/renter/UserGuideScreen";
 
 // LANDLORD
+import LandlordTabs from "./LandlordTabs";
 import LandlordSetupScreen from "../features/landlord/LandlordSetupScreen";
 import LandlordProfileScreen from "../features/landlord/LandlordProfileScreen";
 import AddListingScreen from "../features/landlord/AddListingScreen";
@@ -43,6 +44,7 @@ export default function AppNavigator() {
       <Stack.Screen name="SavedListingsScreen" component={SavedListingsScreen} />
       <Stack.Screen name="ApplicationsScreen" component={ApplicationsScreen} />
       <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />
+      <Stack.Screen name="UserGuideScreen" component={UserGuideScreen} />
 
       {/* LANDLORD & BOOKINGS */}
       <Stack.Screen name="LandlordSetupScreen" component={LandlordSetupScreen} />

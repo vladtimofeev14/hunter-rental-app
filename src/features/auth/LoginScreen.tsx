@@ -15,7 +15,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../../config/firebase";
-import { colors } from "../../styles/globalStyles";
+import { colors, buttons } from "../../styles/globalStyles";
 
 const REMEMBER_LOGIN_KEY = "hunterRememberLogin";
 
@@ -68,7 +68,6 @@ export default function LoginScreen({ navigation }: any) {
 
             const uid = cred.user.uid;
 
-            // FETCH USER DOC
             const userSnap = await getDoc(doc(db, "users", uid));
 
             if (!userSnap.exists()) {
@@ -92,7 +91,6 @@ export default function LoginScreen({ navigation }: any) {
                 await AsyncStorage.removeItem(REMEMBER_LOGIN_KEY);
             }
 
-            // ROUTING LOGIC
             if (role === "renter") {
                 navigation.reset({
                     index: 0,
@@ -127,7 +125,7 @@ export default function LoginScreen({ navigation }: any) {
             <ScrollView contentContainerStyle={styles.content}>
                 <View style={styles.card}>
                     <Image
-                        source={require("../../../assets/logo-icon-blue.png")}
+                        source={require("../../../assets/logo-icon-purple.png")}
                         style={styles.logo}
                         resizeMode="contain"
                     />
@@ -152,7 +150,6 @@ export default function LoginScreen({ navigation }: any) {
                         placeholderTextColor="#A0A0A0"
                     />
 
-                    {/* REMEMBER ME CHECKBOX */}
                     <TouchableOpacity
                         style={styles.rememberRow}
                         onPress={() => setRememberMe(!rememberMe)}
@@ -163,7 +160,9 @@ export default function LoginScreen({ navigation }: any) {
                                 rememberMe && styles.checkboxSelected,
                             ]}
                         >
-                            {rememberMe && <Text style={styles.checkboxMark}>✓</Text>}
+                            {rememberMe && (
+                                <Text style={styles.checkboxMark}>✓</Text>
+                            )}
                         </View>
 
                         <Text style={styles.rememberText}>Remember Me</Text>
@@ -171,11 +170,12 @@ export default function LoginScreen({ navigation }: any) {
 
                     {error && <Text style={styles.error}>{error}</Text>}
 
+                    {/* BUTTON */}
                     <TouchableOpacity
-                        style={styles.button}
+                        style={buttons.primary}
                         onPress={handleLogin}
                     >
-                        <Text style={styles.buttonText}>
+                        <Text style={buttons.primaryText}>
                             {loading ? "Signing in..." : "Login"}
                         </Text>
                     </TouchableOpacity>
@@ -266,18 +266,6 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
 
-    button: {
-        backgroundColor: colors.deepPurple,
-        paddingVertical: 18,
-        borderRadius: 999,
-        alignItems: "center",
-        marginTop: 10,
-    },
-    buttonText: {
-        color: "white",
-        fontWeight: "700",
-        fontSize: 16,
-    },
     error: {
         color: "#DC2626",
         marginBottom: 10,

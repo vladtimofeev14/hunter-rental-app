@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,23 +9,30 @@ import {
   Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  auth,
-  db
-} from "../../config/firebase";
+import { auth, db } from "../../config/firebase";
 import {
   doc,
   getDoc,
   collection,
   getDocs,
   query,
-  where
+  where,
 } from "firebase/firestore";
+import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../styles/globalStyles";
+import { CAMPUSES } from "./data/campuses";
+import { getDistanceKm } from "./utils/distance";
+
+const TAB_OVERLAP = 90;
+
+const parseLeaseMonths = (lease: string | null) => {
+  if (!lease) return null;
+  const num = parseInt(lease);
+  return isNaN(num) ? null : num;
+};
 
 export default function RenterDashboardScreen({ navigation }: any) {
-  const [profile, setProfile] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -37,80 +44,130 @@ export default function RenterDashboardScreen({ navigation }: any) {
   const user = auth.currentUser;
 
   const displayName =
-    userProfile?.firstName ||
     userProfile?.name ||
-    user?.displayName ||
-    user?.email?.split("@")[0] ||
+    userProfile?.email?.split("@")[0] ||
     "User";
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!user) return;
+  const loadData = useCallback(async () => {
+    if (!user) return;
 
-      try {
-        setLoading(true);
+    setLoading(true);
 
-        const profileSnap = await getDoc(doc(db, "renterPreferences", user.uid));
+    try {
+      const userSnap = await getDoc(doc(db, "users", user.uid));
+      const userData = userSnap.exists() ? userSnap.data() : null;
 
-        let prefs: any = null;
-        if (profileSnap.exists()) {
-          prefs = profileSnap.data();
-          setProfile(prefs);
-        }
+      setUserProfile(userData);
 
-        const userSnap = await getDoc(doc(db, "users", user.uid));
-        const userData = userSnap.exists() ? userSnap.data() : null;
+      const prefs = userData?.renterPreferences;
 
-        setUserProfile(userData);
+      setSavedCount((userData?.favoritesID ?? []).length);
 
-        const saved =
-          userData?.favoritesID || [];
+      const appSnap = await getDocs(
+        query(collection(db, "applications"), where("userId", "==", user.uid))
+      );
+      setApplicationsCount(appSnap.size);
 
-        setSavedCount(saved.length);
+      const bookingSnap = await getDocs(
+        query(collection(db, "bookings"), where("renterID", "==", user.uid))
+      );
 
-        const appSnap = await getDocs(
-          query(collection(db, "applications"), where("userId", "==", user.uid))
-        );
-        setApplicationsCount(appSnap.size);
+      setBookings(
+        bookingSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      );
 
-        const bookingSnap = await getDocs(
-          query(collection(db, "bookings"), where("renterID", "==", user.uid))
-        );
-        setBookings(bookingSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const listingsSnap = await getDocs(collection(db, "listings"));
 
-        const listingsSnap = await getDocs(collection(db, "listings"));
+      let listings = listingsSnap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
 
-        let listings = listingsSnap.docs.map(d => ({
-          id: d.id,
-          ...d.data()
-        }));
+      const campus = CAMPUSES.find(c => c.id === prefs?.campusId);
 
-        if (prefs?.budget) {
-          listings = listings.filter((l: any) => l.price?.amount <= prefs.budget);
-        }
-
-        if (prefs?.bedrooms) {
-          listings = listings.filter((l: any) => l.bedrooms === prefs.bedrooms);
-        }
-
-        if (prefs?.city) {
-          listings = listings.filter(
-            (l: any) =>
-              l.city?.toLowerCase() === prefs.city.toLowerCase()
-          );
-        }
-
-        setRecommendations(listings.slice(0, 5));
-
-      } catch (e) {
-        console.log("Dashboard error:", e);
-      } finally {
-        setLoading(false);
+      // 1. budget filter
+      if (prefs?.budget) {
+        listings = listings.filter((l: any) => {
+          const price = l?.price?.amount;
+          return typeof price === "number" && price <= prefs.budget;
+        });
       }
-    };
 
-    loadData();
-  }, []);
+      // 2. property type filter
+      if (prefs?.propertyType) {
+        listings = listings.filter(
+          (l: any) => l?.propertyType === prefs.propertyType
+        );
+      }
+
+      // 3. housing type filter
+      if (prefs?.housingType) {
+        listings = listings.filter(
+          (l: any) => l?.housingType === prefs.housingType
+        );
+      }
+
+      // 4. lease filter 
+      const leaseMonths = parseLeaseMonths(prefs?.leaseLength);
+
+      if (leaseMonths) {
+        listings = listings.filter((l: any) => {
+          if (!l?.leaseLengthMonths) return true;
+          return l.leaseLengthMonths === leaseMonths;
+        });
+      }
+
+      // 5. distance filter 
+      if (campus && prefs?.maxDistanceKm) {
+        listings = listings.filter((l: any) => {
+          if (!l?.lat || !l?.lng) return false;
+
+          const dist = getDistanceKm(
+            campus.lat,
+            campus.lng,
+            l.lat,
+            l.lng
+          );
+
+          return dist <= prefs.maxDistanceKm;
+        });
+      }
+
+      // 6. ranking
+      const scored = listings.map((l: any) => {
+        let score = 0;
+
+        if (prefs?.lifestylePreferences?.length && l?.lifestyleTags) {
+          const overlap = l.lifestyleTags.filter((tag: string) =>
+            prefs.lifestylePreferences.includes(tag)
+          ).length;
+
+          score += overlap * 2;
+        }
+
+        if (prefs?.budget && l?.price?.amount) {
+          const diff = prefs.budget - l.price.amount;
+          if (diff >= 0) score += 1;
+        }
+
+        return { ...l, score };
+      });
+
+      scored.sort((a, b) => b.score - a.score);
+
+      setRecommendations(scored.slice(0, 6));
+    } catch (e) {
+      console.log("Dashboard error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   if (loading) {
     return (
@@ -148,22 +205,34 @@ export default function RenterDashboardScreen({ navigation }: any) {
   ];
 
   return (
-    <SafeAreaView edges={["top", "left", "right"]} style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: TAB_OVERLAP }]}>
 
         {/* HEADER */}
         <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={18} color="#fff" />
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+            <View style={styles.avatar}>
+              {userProfile?.avatarUrl ? (
+                <Image
+                  source={{ uri: userProfile.avatarUrl }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Ionicons name="person" size={18} color="#fff" />
+              )}
+            </View>
+
+            <View style={{ marginLeft: 10 }}>
+              <Text style={styles.greeting}>Hi, {displayName}</Text>
+              <Text style={styles.sub}>Find your next home smarter</Text>
+            </View>
           </View>
 
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={styles.greeting}>Hi, {displayName}</Text>
-            <Text style={styles.sub}>Find your next home smarter</Text>
-          </View>
-
-          <TouchableOpacity onPress={() => navigation.navigate("RenterProfileScreen")}>
-            <Ionicons name="options-outline" size={22} color="#111827" />
+          <TouchableOpacity
+            onPress={() => navigation.navigate("RenterProfileScreen")}
+            style={styles.settingsButton}
+          >
+            <Ionicons name="settings-outline" size={24} color="#111827" />
           </TouchableOpacity>
         </View>
 
@@ -183,9 +252,13 @@ export default function RenterDashboardScreen({ navigation }: any) {
         </View>
 
         {/* RECOMMENDED */}
-        <Text style={styles.sectionTitle}>Recommended for you</Text>
+        <Text style={styles.sectionTitle}>Recommended</Text>
 
-        {recommendations.length > 0 ? (
+        {recommendations.length === 0 ? (
+          <Text style={{ paddingHorizontal: 20, color: "#6B7280" }}>
+            No matches found. Adjust preferences or increase budget.
+          </Text>
+        ) : (
           recommendations.map((item) => (
             <TouchableOpacity
               key={item.id}
@@ -194,62 +267,48 @@ export default function RenterDashboardScreen({ navigation }: any) {
                 navigation.navigate("PropertyDetailsScreen", { listing: item })
               }
             >
-              {item.images?.[0] ? (
-                <Image source={{ uri: item.images[0] }} style={styles.image} />
-              ) : (
-                <View style={styles.imagePlaceholder} />
-              )}
-
+              <Image source={{ uri: item.images?.[0] }} style={styles.image} />
               <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>{item.name || "Property"}</Text>
+                <Text style={styles.cardTitle}>{item.name}</Text>
                 <Text style={styles.cardSub}>
-                  ${item.price?.amount ?? "—"} · {item.city ?? "Unknown"}
+                  ${item.price?.amount} · {item.city}
                 </Text>
               </View>
             </TouchableOpacity>
           ))
-        ) : (
-          <View style={styles.card}>
-            <Text style={styles.cardSub}>No matches found.</Text>
-          </View>
         )}
 
-        {/* UPCOMING */}
-        <Text style={styles.sectionTitle}>Upcoming viewing</Text>
-
-        {bookings.length > 0 ? (
-          <View style={styles.cardHighlight}>
-            <Text style={styles.cardTitle}>{bookings[0].listingTitle}</Text>
-            <Text style={styles.cardSub}>Status: {bookings[0].status}</Text>
-          </View>
-        ) : (
-          <View style={styles.card}>
-            <Text style={styles.cardSub}>No upcoming bookings</Text>
-          </View>
-        )}
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F6F7FB" },
+  container: {
+    flex: 1,
+    backgroundColor: "#F6F7FB"
+  },
 
-  content: { paddingBottom: 20 },
+  content: {
+    paddingBottom: 20
+  },
 
   loading: {
     flex: 1,
     justifyContent: "center",
-    alignItems: "center",
+    alignItems: "center"
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingTop: 18,
+  },
+
+  settingsButton: {
+    padding: 8
   },
 
   avatar: {
@@ -261,9 +320,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  greeting: { fontSize: 18, fontWeight: "800", color: "#111827" },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 19,
+  },
 
-  sub: { fontSize: 12, color: "#6B7280" },
+  greeting: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#111827"
+  },
+
+  sub: {
+    fontSize: 12,
+    color: "#6B7280"
+  },
 
   metrics: {
     flexDirection: "row",
@@ -281,9 +353,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  metricValue: { fontSize: 18, fontWeight: "800", marginTop: 6 },
+  metricValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginTop: 6
+  },
 
-  metricLabel: { fontSize: 12, color: "#6B7280" },
+  metricLabel: {
+    fontSize: 12,
+    color: "#6B7280"
+  },
 
   sectionTitle: {
     marginTop: 18,
@@ -304,36 +383,21 @@ const styles = StyleSheet.create({
 
   image: {
     width: "100%",
-    height: 120,
-  },
-
-  imagePlaceholder: {
-    width: "100%",
-    height: 120,
-    backgroundColor: "#E5E7EB",
+    height: 120
   },
 
   cardContent: {
-    padding: 12,
+    padding: 12
   },
 
-  cardTitle: { fontSize: 14, fontWeight: "700" },
-
-  cardSub: { fontSize: 12, color: "#6B7280", marginTop: 4 },
-
-  card: {
-    marginHorizontal: 20,
-    backgroundColor: "#fff",
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: "700"
   },
 
-  cardHighlight: {
-    marginHorizontal: 20,
-    backgroundColor: "#EEF2FF",
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
+  cardSub: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 4
   },
 });

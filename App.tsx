@@ -1,4 +1,4 @@
-import 'react-native-gesture-handler'; // THIS MUST BE THE ABSOLUTE FIRST LINE
+import 'react-native-gesture-handler';
 
 /*
 Dependecies
@@ -7,9 +7,14 @@ npm install @react-navigation/native-stack
 npx expo install react-native-screens react-native-safe-area-context
 npx expo install expo-symbols
 npx expo install @react-native-async-storage/async-storage
+npx expo install react-native-gesture-handler
+
+Map
 npx expo install react-native-map-clustering
 npx expo install react-native-maps
-npx expo install react-native-gesture-handler
+npx expo install expo-location
+npm install react-native-svg
+npm install react-native-svg-transformer
 
 API
 npm install axios

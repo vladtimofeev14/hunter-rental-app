@@ -1,19 +1,16 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
   FlatList,
-  StyleSheet,
   ActivityIndicator,
   Pressable,
   Alert,
+  StyleSheet,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Swipeable } from "react-native-gesture-handler";
-import {
-  auth,
-  db,
-} from "../../config/firebase";
+import { auth, db } from "../../config/firebase";
 import {
   doc,
   getDoc,
@@ -24,6 +21,7 @@ import {
   getDocs,
   documentId,
 } from "firebase/firestore";
+import { useFocusEffect } from "@react-navigation/native";
 import ListingCard from "./components/ListingCard";
 import { colors } from "../../styles/globalStyles";
 
@@ -31,66 +29,65 @@ export default function SavedListingsScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [listings, setListings] = useState<any[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
-
-  // Hook to calculate spacing for the phone's bottom home indicator
-  const insets = useSafeAreaInsets();
+  const user = auth.currentUser;
 
   const load = useCallback(async () => {
-    const user = auth.currentUser;
     if (!user) return;
 
     setLoading(true);
 
-    const userSnap = await getDoc(doc(db, "users", user.uid));
+    try {
+      const userSnap = await getDoc(doc(db, "users", user.uid));
+      const favs = userSnap.exists() ? userSnap.data()?.favoritesID ?? [] : [];
 
-    const favs: string[] =
-      userSnap.exists() ? userSnap.data()?.favoritesID || [] : [];
+      setFavorites(favs);
 
-    setFavorites(favs);
+      if (favs.length === 0) {
+        setListings([]);
+        return;
+      }
 
-    if (favs.length === 0) {
+      const chunks: string[][] = [];
+      for (let i = 0; i < favs.length; i += 10) {
+        chunks.push(favs.slice(i, i + 10));
+      }
+
+      const results: any[] = [];
+
+      for (const chunk of chunks) {
+        const q = query(
+          collection(db, "listings"),
+          where(documentId(), "in", chunk)
+        );
+
+        const snap = await getDocs(q);
+
+        snap.forEach((d) => {
+          results.push({ id: d.id, ...d.data() });
+        });
+      }
+
+      setListings(results);
+    } catch (e) {
+      console.log("Saved error:", e);
       setListings([]);
+    } finally {
       setLoading(false);
-      return;
     }
+  }, [user]);
 
-    const chunks: string[][] = [];
-    for (let i = 0; i < favs.length; i += 10) {
-      chunks.push(favs.slice(i, i + 10));
-    }
-
-    const results: any[] = [];
-
-    for (const chunk of chunks) {
-      const q = query(
-        collection(db, "listings"),
-        where(documentId(), "in", chunk)
-      );
-
-      const snap = await getDocs(q);
-
-      snap.forEach((d) => {
-        results.push({ id: d.id, ...d.data() });
-      });
-    }
-
-    setListings(results);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const removeOne = async (id: string) => {
-    const user = auth.currentUser;
     if (!user) return;
-
-    const userRef = doc(db, "users", user.uid);
 
     const updated = favorites.filter((f) => f !== id);
 
-    await updateDoc(userRef, {
+    await updateDoc(doc(db, "users", user.uid), {
       favoritesID: updated,
     });
 
@@ -98,90 +95,52 @@ export default function SavedListingsScreen({ navigation }: any) {
     setListings((prev) => prev.filter((l) => l.id !== id));
   };
 
-  const clearAll = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    await updateDoc(doc(db, "users", user.uid), {
-      favoritesID: [],
-    });
-
-    setFavorites([]);
-    setListings([]);
-  };
-
-  // Delete confirmation
   const confirmRemove = (id: string) => {
-    Alert.alert("Remove Property", "Are you sure you want to remove this property from your saved list?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert("Remove", "Remove this listing?", [
+      { text: "Cancel" },
       { text: "Remove", style: "destructive", onPress: () => removeOne(id) },
     ]);
   };
 
-  const confirmClearAll = () => {
-    Alert.alert("Clear All Saved", "Are you sure you want to remove all saved properties? This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Clear All", style: "destructive", onPress: () => clearAll() },
-    ]);
-  };
-
-  // Swipe delete action
-  const renderRightActions = (id: string) => {
-    return (
-      <Pressable
-        onPress={() => confirmRemove(id)}
-        style={styles.deleteAction}
-      >
-        <Text style={styles.deleteText}>Delete</Text>
-      </Pressable>
-    );
-  };
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.center}>
+      <SafeAreaView style={{ flex: 1, justifyContent: "center" }}>
         <ActivityIndicator size="large" color={colors.deepPurple} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Saved Properties</Text>
-          <Text style={styles.subtitle}>
-            {favorites.length} saved listings
-          </Text>
-        </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F6F7FB" }}>
+      <View style={{ padding: 16 }}>
+        <Text style={{ fontSize: 22, fontWeight: "800" }}>
+          Saved Properties
+        </Text>
+        <Text>{favorites.length} saved</Text>
       </View>
 
-      {/* LIST */}
       <FlatList
         data={listings}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <Swipeable renderRightActions={() => renderRightActions(item.id)}>
+          <Swipeable
+            renderRightActions={() => (
+              <Pressable
+                onPress={() => confirmRemove(item.id)}
+                style={{
+                  backgroundColor: "red",
+                  justifyContent: "center",
+                  padding: 20,
+                }}
+              >
+                <Text style={{ color: "white" }}>Delete</Text>
+              </Pressable>
+            )}
+          >
             <ListingCard item={item} navigation={navigation} />
           </Swipeable>
         )}
-        contentContainerStyle={{ paddingBottom: 160 }}
       />
-
-      {/* BOTTOM ACTION */}
-      {favorites.length > 0 && (
-        <View
-          style={[
-            styles.bottomBar,
-            { paddingBottom: Math.max(insets.bottom, 20) + 14 }
-          ]}
-        >
-          <Pressable onPress={confirmClearAll} style={styles.clearBtn}>
-            <Text style={styles.clearText}>Clear all</Text>
-          </Pressable>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -193,9 +152,9 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 6,
+    paddingBottom: 10,
   },
 
   title: {
@@ -223,7 +182,6 @@ const styles = StyleSheet.create({
   deleteText: {
     color: "white",
     fontWeight: "800",
-    fontSize: 14,
   },
 
   bottomBar: {
@@ -253,5 +211,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  empty: {
+    marginTop: 40,
+    alignItems: "center",
+  },
+
+  emptyText: {
+    color: "#6B7280",
   },
 });

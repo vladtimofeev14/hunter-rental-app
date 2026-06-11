@@ -14,7 +14,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 
 import { auth, db } from "../../config/firebase";
-import { colors } from "../../styles/globalStyles";
+import { colors, buttons } from "../../styles/globalStyles";
 
 export default function SignupScreen({ navigation }: any) {
     const [firstName, setFirstName] = useState("");
@@ -183,24 +183,37 @@ export default function SignupScreen({ navigation }: any) {
 
                     <TouchableOpacity
                         style={styles.passwordHintContainer}
-                        onPress={() => setShowPasswordRules(!showPasswordRules)}
+                        onPress={() =>
+                            setShowPasswordRules(!showPasswordRules)
+                        }
                     >
                         <Text style={styles.link}>Password requirements</Text>
                     </TouchableOpacity>
 
                     {showPasswordRules && (
                         <View style={styles.rules}>
-                            <Text style={styles.ruleText}>• Minimum 8 characters</Text>
-                            <Text style={styles.ruleText}>• At least 1 letter</Text>
-                            <Text style={styles.ruleText}>• At least 1 number</Text>
-                            <Text style={styles.ruleText}>• At least 1 special character</Text>
+                            <Text style={styles.ruleText}>
+                                • Minimum 8 characters
+                            </Text>
+                            <Text style={styles.ruleText}>
+                                • At least 1 letter
+                            </Text>
+                            <Text style={styles.ruleText}>
+                                • At least 1 number
+                            </Text>
+                            <Text style={styles.ruleText}>
+                                • At least 1 special character
+                            </Text>
                         </View>
                     )}
 
                     {error && <Text style={styles.error}>{error}</Text>}
 
-                    <TouchableOpacity style={styles.button} onPress={handleSignup}>
-                        <Text style={styles.buttonText}>
+                    <TouchableOpacity
+                        style={buttons.primary}
+                        onPress={handleSignup}
+                    >
+                        <Text style={buttons.primaryText}>
                             {loading ? "Creating..." : "Create account"}
                         </Text>
                     </TouchableOpacity>
@@ -313,20 +326,6 @@ const styles = StyleSheet.create({
         color: "#DC2626",
         marginTop: 10,
         marginBottom: 10,
-    },
-
-    button: {
-        backgroundColor: colors.deepPurple,
-        paddingVertical: 18,
-        borderRadius: 999,
-        alignItems: "center",
-        marginTop: 10,
-    },
-
-    buttonText: {
-        color: "white",
-        fontWeight: "700",
-        fontSize: 16,
     },
 
     loginContainer: {
