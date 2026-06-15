@@ -10,19 +10,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function UserGuideScreen({ navigation }: any) {
     const goToSearch = () => {
-        if (navigation?.navigate) {
-            navigation.navigate("SearchScreen");
-        } else {
-            console.warn("Navigation not available or screen not registered");
-        }
+        navigation.navigate("RenterTabs", {
+            screen: "Search",
+        });
     };
 
     const goToMap = () => {
-        if (navigation?.navigate) {
-            navigation.navigate("MapScreen");
-        } else {
-            console.warn("Navigation not available or screen not registered");
-        }
+        navigation.navigate("RenterTabs", {
+            screen: "Map",
+        });
     };
 
     return (
@@ -108,7 +104,7 @@ const styles = StyleSheet.create({
 
     scrollContent: {
         padding: 16,
-        paddingBottom: 40,
+        paddingBottom: 120,
     },
 
     headerCard: {

@@ -1,52 +1,95 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
   FlatList,
-  StyleSheet,
   ActivityIndicator,
+  Pressable,
+  StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Swipeable } from "react-native-gesture-handler";
+import { useFocusEffect } from "@react-navigation/native";
 import { auth, db } from "../../config/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { colors } from "../../styles/globalStyles";
+import { formatDateTime, toDate } from "../chat/chatHelpers";
 
-export default function NotificationsScreen() {
-  const [notifications, setNotifications] = useState<any[]>([]);
+export default function NotificationsScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [dismissed, setDismissed] = useState<string[]>([]);
 
-  useEffect(() => {
-    const load = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        setLoading(false);
-        return;
-      }
+  const user = auth.currentUser;
 
-      try {
-        const q = query(
-          collection(db, "notifications"),
-          where("userId", "==", user.uid)
-        );
+  const load = useCallback(async () => {
+    if (!user) return;
 
-        const snap = await getDocs(q);
+    setLoading(true);
 
-        const data = snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }));
+    try {
+      const q = query(
+        collection(db, "bookings"),
+        where("renterID", "==", user.uid)
+      );
 
-        setNotifications(data);
-      } catch (e) {
-        console.log("Notifications load error:", e);
-        setNotifications([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const snap = await getDocs(q);
 
-    load();
-  }, []);
+      const data = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a: any, b: any) => {
+          const aTime =
+            toDate(a.updatedAt)?.getTime() ||
+            toDate(a.createdAt)?.getTime() ||
+            toDate(a.scheduledAt)?.getTime() ||
+            0;
+
+          const bTime =
+            toDate(b.updatedAt)?.getTime() ||
+            toDate(b.createdAt)?.getTime() ||
+            toDate(b.scheduledAt)?.getTime() ||
+            0;
+
+          return bTime - aTime;
+        });
+
+      setNotifications(data);
+    } catch (e) {
+      console.log("Notifications error:", e);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const dismiss = (id: string) => {
+    setDismissed((prev) => [...prev, id]);
+  };
+
+  const visible = notifications.filter(
+    (n) => !dismissed.includes(n.id)
+  );
+
+  const getMessage = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "Viewing request submitted";
+      case "accepted":
+        return "Viewing accepted";
+      case "rejected":
+        return "Viewing rejected";
+      case "completed":
+        return "Viewing completed";
+      default:
+        return "Booking update";
+    }
+  };
 
   if (loading) {
     return (
@@ -60,31 +103,57 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Notifications</Text>
 
-      {notifications.length === 0 ? (
+      {visible.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>
-            No notifications yet
-          </Text>
+          <Text style={styles.emptyText}>No notifications</Text>
         </View>
       ) : (
         <FlatList
-          data={notifications}
+          data={visible}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: 120 }}
           renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Text style={styles.name}>
-                {item.title}
-              </Text>
+            <Swipeable
+              renderRightActions={() => (
+                <Pressable
+                  onPress={() => dismiss(item.id)}
+                  style={styles.deleteAction}
+                >
+                  <Text style={styles.deleteText}>Dismiss</Text>
+                </Pressable>
+              )}
+            >
+              <Pressable
+                onPress={() =>
+                  navigation.navigate("BookingDetailsScreen", {
+                    bookingId: item.id,
+                  })
+                }
+                style={styles.card}
+              >
+                <View style={styles.row}>
+                  <Text style={styles.name}>
+                    {item.listingTitle || item.listingName || "Property"}
+                  </Text>
 
-              <Text style={styles.message}>
-                {item.message}
-              </Text>
+                  <Text style={styles.status}>
+                    {item.status}
+                  </Text>
+                </View>
 
-              <Text style={styles.type}>
-                {item.type || "info"}
-              </Text>
-            </View>
+                <Text style={styles.message}>
+                  {getMessage(item.status)}
+                </Text>
+
+                <Text style={styles.meta}>
+                  {item.listingAddress || "Address unavailable"}
+                </Text>
+
+                <Text style={styles.time}>
+                  {formatDateTime(item.scheduledAt)}
+                </Text>
+              </Pressable>
+            </Swipeable>
           )}
         />
       )}
@@ -114,19 +183,38 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
   name: {
     fontSize: 14,
     fontWeight: "700",
+    color: colors.black,
+  },
+
+  status: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.primaryBlue,
+    textTransform: "capitalize",
   },
 
   message: {
     marginTop: 6,
-    fontSize: 12,
-    color: "#6B7280",
+    fontSize: 13,
+    color: "#4B5563",
   },
 
-  type: {
-    marginTop: 8,
+  meta: {
+    marginTop: 6,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+
+  time: {
+    marginTop: 6,
     fontSize: 11,
     color: "#9CA3AF",
   },
@@ -140,6 +228,19 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: "center",
     color: "#6B7280",
+  },
+
+  deleteAction: {
+    backgroundColor: "red",
+    justifyContent: "center",
+    padding: 20,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+
+  deleteText: {
+    color: "white",
+    fontWeight: "700",
   },
 
   center: {

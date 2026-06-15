@@ -37,7 +37,6 @@ export default function RenterDashboardScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
 
   const [savedCount, setSavedCount] = useState(0);
-  const [applicationsCount, setApplicationsCount] = useState(0);
   const [bookings, setBookings] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
 
@@ -62,11 +61,6 @@ export default function RenterDashboardScreen({ navigation }: any) {
       const prefs = userData?.renterPreferences;
 
       setSavedCount((userData?.favoritesID ?? []).length);
-
-      const appSnap = await getDocs(
-        query(collection(db, "applications"), where("userId", "==", user.uid))
-      );
-      setApplicationsCount(appSnap.size);
 
       const bookingSnap = await getDocs(
         query(collection(db, "bookings"), where("renterID", "==", user.uid))
@@ -185,12 +179,6 @@ export default function RenterDashboardScreen({ navigation }: any) {
       screen: "Search",
     },
     {
-      label: "Applications",
-      value: applicationsCount,
-      icon: "document-text-outline",
-      screen: "ApplicationsScreen",
-    },
-    {
       label: "Bookings",
       value: bookings.length,
       icon: "calendar-outline",
@@ -232,7 +220,7 @@ export default function RenterDashboardScreen({ navigation }: any) {
             onPress={() => navigation.navigate("RenterProfileScreen")}
             style={styles.settingsButton}
           >
-            <Ionicons name="settings-outline" size={24} color="#111827" />
+            <Ionicons name="options-outline" size={24} color="#111827" />
           </TouchableOpacity>
         </View>
 
@@ -339,18 +327,18 @@ const styles = StyleSheet.create({
 
   metrics: {
     flexDirection: "row",
-    flexWrap: "wrap",
     paddingHorizontal: 20,
     marginTop: 15,
     gap: 10,
   },
 
   metricCard: {
-    width: "48%",
+    flex: 1,
     backgroundColor: "#fff",
     borderRadius: 16,
     paddingVertical: 18,
     alignItems: "center",
+    marginHorizontal: 5,
   },
 
   metricValue: {

@@ -59,7 +59,6 @@ export default function RenterProfileScreen({ navigation }: any) {
     const parts = fullName.trim().split(/\s+/).filter(Boolean);
     const firstName = parts[0] || "";
     const lastName = parts.slice(1).join(" ");
-
     return { firstName, lastName };
   };
 
@@ -70,10 +69,8 @@ export default function RenterProfileScreen({ navigation }: any) {
     if (!user) return;
 
     const batch = writeBatch(db);
-
     batch.set(doc(db, "users", user.uid), userPayload, { merge: true });
     batch.set(doc(db, "sharedUsers", user.uid), sharedPayload, { merge: true });
-
     await batch.commit();
   };
 
@@ -107,15 +104,8 @@ export default function RenterProfileScreen({ navigation }: any) {
     setName(cleanName);
 
     await updateSharedProfile(
-      {
-        name: cleanName,
-        firstName,
-        lastName,
-      },
-      {
-        firstName,
-        lastName,
-      }
+      { name: cleanName, firstName, lastName },
+      { firstName, lastName }
     );
   };
 
@@ -130,9 +120,18 @@ export default function RenterProfileScreen({ navigation }: any) {
     );
   };
 
-  const logout = async () => {
-    await signOut(auth);
-    navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+  const logout = () => {
+    Alert.alert("Log out", "Do you want to log out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log out",
+        style: "destructive",
+        onPress: async () => {
+          await signOut(auth);
+          navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+        },
+      },
+    ]);
   };
 
   const deleteAccount = async () => {
@@ -244,10 +243,7 @@ export default function RenterProfileScreen({ navigation }: any) {
             <Text style={buttons.secondaryText}>Log out</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={deleteAccount}
-          >
+          <TouchableOpacity style={styles.deleteButton} onPress={deleteAccount}>
             <Text style={styles.deleteText}>Delete account</Text>
           </TouchableOpacity>
         </View>

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Image,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth, db } from "../../config/firebase";
@@ -13,7 +14,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { colors } from "../../styles/globalStyles";
 import { formatDateTime, toDate } from "../chat/chatHelpers";
 
-export default function BookingsListScreen() {
+export default function BookingsListScreen({ navigation }: any) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,22 +34,23 @@ export default function BookingsListScreen() {
     const unsubscribe = onSnapshot(
       bookingsQuery,
       (snap) => {
-        setBookings(
-          snap.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
-            .sort((a: any, b: any) => {
-              const aTime =
-                toDate(a.scheduledAt)?.getTime() ||
-                toDate(a.createdAt)?.getTime() ||
-                0;
-              const bTime =
-                toDate(b.scheduledAt)?.getTime() ||
-                toDate(b.createdAt)?.getTime() ||
-                0;
-              return aTime - bTime;
-            })
-        );
+        const data = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a: any, b: any) => {
+            const aTime =
+              toDate(a.scheduledAt)?.getTime() ||
+              toDate(a.createdAt)?.getTime() ||
+              0;
 
+            const bTime =
+              toDate(b.scheduledAt)?.getTime() ||
+              toDate(b.createdAt)?.getTime() ||
+              0;
+
+            return aTime - bTime;
+          });
+
+        setBookings(data);
         setLoading(false);
       },
       (e) => {
@@ -82,15 +84,26 @@ export default function BookingsListScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: 120 }}
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <Pressable
+              style={styles.card}
+              onPress={() =>
+                navigation.navigate("BookingDetailsScreen", {
+                  id: item.id,
+                })
+              }
+            >
               {item.listingImage ? (
-                <Image source={{ uri: item.listingImage }} style={styles.image} />
+                <Image
+                  source={{ uri: item.listingImage }}
+                  style={styles.image}
+                />
               ) : null}
 
               <View style={styles.cardHeader}>
                 <Text style={styles.name}>
                   {item.listingTitle || item.listingName || "Property"}
                 </Text>
+
                 <View style={styles.statusBadge}>
                   <Text style={styles.statusText}>{item.status}</Text>
                 </View>
@@ -99,13 +112,15 @@ export default function BookingsListScreen() {
               <Text style={styles.meta}>
                 {item.listingAddress || "Address unavailable"}
               </Text>
+
               <Text style={styles.meta}>
                 Landlord: {item.landlordName || "Landlord"}
               </Text>
+
               <Text style={styles.sub}>
                 Viewing date: {formatDateTime(item.scheduledAt)}
               </Text>
-            </View>
+            </Pressable>
           )}
         />
       )}
@@ -142,17 +157,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
   name: {
     flex: 1,
     fontSize: 15,
     fontWeight: "700",
     color: colors.black,
-  },
-
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
   },
 
   statusBadge: {

@@ -144,11 +144,8 @@ export default function LandlordProfileScreen({ navigation }: any) {
   };
 
   const logout = () => {
-    Alert.alert("Log out", "Are you sure you want to log out?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
+    Alert.alert("Log out", "Do you want to log out?", [
+      { text: "Cancel", style: "cancel" },
       {
         text: "Log out",
         style: "destructive",

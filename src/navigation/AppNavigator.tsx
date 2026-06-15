@@ -18,6 +18,7 @@ import BookingsListScreen from "../features/renter/BookingsListScreen";
 import UserGuideScreen from "../features/renter/UserGuideScreen";
 import ConversationsListScreen from "../features/chat/ConversationsListScreen";
 import ConversationScreen from "../features/chat/ConversationScreen";
+import BookingDetailsScreen from "../features/renter/BookingDetailsScreen";
 
 // LANDLORD
 import LandlordTabs from "./LandlordTabs";
@@ -50,6 +51,7 @@ export default function AppNavigator() {
       <Stack.Screen name="UserGuideScreen" component={UserGuideScreen} />
       <Stack.Screen name="ConversationsListScreen" component={ConversationsListScreen} />
       <Stack.Screen name="ConversationScreen" component={ConversationScreen} />
+      <Stack.Screen name="BookingDetailsScreen" component={BookingDetailsScreen} />
 
       {/* LANDLORD & BOOKINGS */}
       <Stack.Screen name="LandlordSetupScreen" component={LandlordSetupScreen} />
