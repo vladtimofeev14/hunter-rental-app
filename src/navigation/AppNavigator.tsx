@@ -12,7 +12,6 @@ import RenterPreferencesScreen from "../features/renter/RenterPreferencesScreen"
 import RenterTabs from "./RenterTabs";
 import MapScreen from "../features/renter/MapScreen";
 import SavedListingsScreen from "../features/renter/SavedListingsScreen";
-import ApplicationsScreen from "../features/renter/ApplicationsScreen";
 import NotificationsScreen from "../features/renter/NotificationsScreen";
 import BookingsListScreen from "../features/renter/BookingsListScreen";
 import UserGuideScreen from "../features/renter/UserGuideScreen";
@@ -46,7 +45,6 @@ export default function AppNavigator() {
       <Stack.Screen name="RenterTabs" component={RenterTabs} />
       <Stack.Screen name="MapScreen" component={MapScreen} />
       <Stack.Screen name="SavedListingsScreen" component={SavedListingsScreen} />
-      <Stack.Screen name="ApplicationsScreen" component={ApplicationsScreen} />
       <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />
       <Stack.Screen name="UserGuideScreen" component={UserGuideScreen} />
       <Stack.Screen name="ConversationsListScreen" component={ConversationsListScreen} />
